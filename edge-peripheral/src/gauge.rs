@@ -20,6 +20,15 @@ pub struct Measurement {
     pub humidity: f32
 }
 
+impl Measurement {
+    const DEVIATION: Measurement = Measurement {
+        battery: 1,
+        lux: 50.0,
+        temperature: 1.0,
+        humidity: 1.0
+    };
+}
+
 impl <'a, P : AdcChannel> Gauge<'a, P> {
     pub fn new(i2c: RefCell<I2c<'a, Blocking>>, pcb_pwr: Output<'a>, bm: BatteryMeasurement<'a, P>) -> Self {
         Self {

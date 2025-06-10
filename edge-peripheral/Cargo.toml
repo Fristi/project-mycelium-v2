@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name    = "firmware"
+name    = "edge-peripheral"
 version = "0.1.0"
 
 
@@ -8,6 +8,8 @@ version = "0.1.0"
 nb = "1.1.0"
 shtcx = { git = "https://github.com/Fristi/shtcx-rs", rev = "d733731ff1e439459a8357310c85439ef9f64898" }
 bh1730fvc = { git = "https://github.com/Fristi/bh1730fvc-rs", rev = "dff319f4aae9da82dcea45c1f2b2ecd347da31c9" }
+timeseries = { git = "https://github.com/Fristi/timeseries", rev = "ca2808e7fef75f641ef82f50168ca0a1bc5e5c08" }
+current-time = { path = "../current-time" }
 bt-hci = { version = "0.2.1", features = ["defmt"] }
 trouble-host = { version = "0.1.0", features = ["defmt", "gatt", "peripheral", "l2cap-tx-packet-pool-size-3"] }
 critical-section = "1.2.0"
@@ -21,7 +23,7 @@ embassy-time = { version = "0.4.0", features = ["defmt", "generic-queue-8"] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
 embedded-hal = "1.0.0"
-embedded-hal-bus = { version = "0.3.0", features = ["async"] }
+embedded-hal-bus = { version = "0.3.0", features = [] }
 embedded-hal-async = "1.0.0"
 esp-alloc = "0.7.0"
 esp-backtrace = { version = "0.15.1", features = [

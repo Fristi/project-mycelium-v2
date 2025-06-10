@@ -3,6 +3,7 @@ use embassy_futures::select::select;
 use embassy_time::Timer;
 use defmt::{info, warn};
 use trouble_host::prelude::*;
+use current_time::{AdjustReason, CurrentTime};
 
 /// Max number of connections
 const CONNECTIONS_MAX: usize = 1;
@@ -16,6 +17,14 @@ const L2CAP_MTU: usize = 255;
 #[gatt_server]
 struct Server {
     battery_service: BatteryService,
+    time_service: TimeService
+}
+
+/// Time service
+#[gatt_service(uuid = service::CURRENT_TIME)]
+struct TimeService {
+    #[characteristic(uuid = characteristic::CURRENT_TIME, write, read)]
+    current_time: [u8; 10]
 }
 
 /// Battery service
@@ -95,6 +104,7 @@ async fn ble_task<C: Controller>(mut runner: Runner<'_, C>) {
 /// This is how we interact with read and write requests.
 async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>) -> Result<(), Error> {
     let level = server.battery_service.level;
+    let current_time = server.time_service.current_time;
     let reason = loop {
         match conn.next().await {
             GattConnectionEvent::Disconnected { reason } => break reason,
@@ -105,6 +115,11 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>) ->
                         if event.handle() == level.handle {
                             let value = server.get(&level);
                             info!("[gatt] Read Event to Level Characteristic: {:?}", value);
+                        }
+
+                        if(event.handle() == current_time.handle) {
+                            let value = server.get(&current_time);
+                            info!("[gatt] Read Event to curren time Characteristic: {:?}", value);
                         }
                     }
                     GattEvent::Write(event) => {
@@ -138,7 +153,7 @@ async fn advertise<'values, 'server, C: Controller>(
     let len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::ServiceUuids16(&[[0x0f, 0x18]]),
+            AdStructure::ServiceUuids16(&[[0x05, 0x18]]),
             AdStructure::CompleteLocalName(name.as_bytes()),
         ],
         &mut advertiser_data[..],
@@ -169,8 +184,16 @@ async fn custom_task<C: Controller>(
 ) {
     let mut tick: u8 = 0;
     let level = server.battery_service.level;
+    let current_time = server.time_service.current_time;
+    let now = CurrentTime { year: 2025, month: 6, day: 10, hour: 9, minute: 39, day_of_week: current_time::DayOfWeek::Tuesday, second: 20, fractions256: 23, adjust_reason: AdjustReason::empty() };
+
+    current_time.set(&server, &now.to_bytes()).expect("Unable to set the time");
+
     loop {
         tick = tick.wrapping_add(1);
+
+
+
         info!("[custom_task] notifying connection of tick {}", tick);
         if level.notify(conn, &tick).await.is_err() {
             info!("[custom_task] error notifying connection");

@@ -1,0 +1,7 @@
+[package]
+edition = "2021"
+name    = "current-time"
+version = "0.1.0"
+
+[dependencies]
+bitflags = { version = "2.9.1", features = ["bytemuck"] }
