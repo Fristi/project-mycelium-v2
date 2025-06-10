@@ -162,6 +162,7 @@ name = "current-time"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.9.1",
+ "chrono",
 ]
 
 [[package]]
@@ -266,6 +267,7 @@ version = "0.1.0"
 dependencies = [
  "bh1730fvc",
  "bt-hci",
+ "chrono",
  "critical-section",
  "current-time",
  "defmt 1.0.1",

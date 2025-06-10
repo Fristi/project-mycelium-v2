@@ -225,6 +225,7 @@ name = "current-time"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "chrono",
 ]
 
 [[package]]
