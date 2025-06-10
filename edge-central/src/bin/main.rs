@@ -2,9 +2,11 @@ use btleplug::api::bleuuid::uuid_from_u16;
 use btleplug::api::{Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType, ValueNotification};
 use btleplug::platform::{Adapter, Manager};
 use uuid::Uuid;
-use chrono::{Local, Timelike, Datelike};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use tokio::time::{sleep, Duration};
+use std::alloc::System;
 use std::error::Error;
+use std::time::SystemTime;
 use current_time::CurrentTime;
 
 const CURRENT_TIME_SERVICE_UUID: Uuid = uuid_from_u16(0x1805);
@@ -63,34 +65,40 @@ async fn main() -> Result<(), Box<dyn Error>> {
             });
 
             if let Some(charac) = characteristic {
+                let now = Utc::now();
                 // Read current time from device
                 match peripheral.read(charac).await {
                     Ok(data) => {
-                        let bytes = &data.try_into().expect("Unable to convert");
-                        let current_time = CurrentTime::from_bytes(bytes);
+                        let bytes = data.try_into().expect("Unable to convert");
+                        let current_time = CurrentTime::from_bytes(&bytes);
+                        if let Some((secs, nsecs)) = current_time.to_unix_timestamp() {
+                            match DateTime::from_timestamp(secs, nsecs) {
+                                Some(time) => {
+                                    let duration = now - time;
 
-                        println!("Time on device {:?}", current_time);
+                                    println!("Time drift: {:?}", duration);
+                                    println!("Here: {:?}, Device: {:?}", now, time);
+
+                                },
+                                None => ()
+                            }
+                        }                        
                     },
                     Err(e) => println!("Failed to read time: {}", e),
                 }
 
-                // Write current system time to the device
-                // let now = Local::now();
-                // let mut buffer = vec![];
-                // buffer.extend_from_slice(&now.year().to_le_bytes()); // Year
-                // buffer.push(now.month() as u8);
-                // buffer.push(now.day() as u8);
-                // buffer.push(now.hour() as u8);
-                // buffer.push(now.minute() as u8);
-                // buffer.push(now.second() as u8);
-                // buffer.push(0); // Day of week (0 = unknown)
-                // buffer.push(0); // Fractions256
-                // buffer.push(0); // Adjust reason
+                let now = Utc::now();
+                let ts = now.timestamp();
 
-                // match peripheral.write(charac, &buffer, WriteType::WithResponse).await {
-                //     Ok(_) => println!("Updated device time to: {}", now),
-                //     Err(e) => println!("Failed to write time: {}", e),
-                // }
+                let current_time = CurrentTime::from_unix_timestamp(ts);
+
+                if let Some(ct) = current_time {
+                    let bytes = ct.to_bytes();
+                    match peripheral.write(charac, &bytes, WriteType::WithResponse).await {
+                        Ok(_) => println!("Updated device time to: {}", now),
+                        Err(e) => println!("Failed to write time: {}", e),
+                    }
+                }
             }
 
             peripheral.disconnect().await?;

@@ -1,7 +1,7 @@
 use embassy_futures::join::join;
 use embassy_futures::select::select;
 use embassy_time::Timer;
-use defmt::{info, warn};
+use defmt::{info, warn, Debug2Format};
 use trouble_host::prelude::*;
 use current_time::{AdjustReason, CurrentTime};
 
@@ -65,9 +65,10 @@ where
     info!("Starting adv and event loop");
 
     let _ = join(ble_task(runner), async {
-        loop {
-            info!("Advertising...");
+        
+        info!("Advertising...");
 
+        loop {
             match advertise("Trouble Example", &mut peripheral, &server).await {
                 Ok(conn) => {
                     info!("Got gatt connection");
@@ -84,6 +85,8 @@ where
                 }
             }
         }
+
+        
     })
     .await;
 }
@@ -125,6 +128,14 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>) ->
                     GattEvent::Write(event) => {
                         if event.handle() == level.handle {
                             info!("[gatt] Write Event to Level Characteristic: {:?}", event.data());
+                        }
+
+                        if event.handle() == current_time.handle {
+                            let bytes = event.data().try_into().expect("Unable to convert");
+                            let ct = CurrentTime::from_bytes(&bytes);
+                            info!("[gatt] Write Event to current time Characteristic: {:?}", Debug2Format(&ct));
+
+                            current_time.set(&server, &ct.to_bytes()).expect("Unable to set the time");
                         }
                     }
                 };
@@ -184,11 +195,6 @@ async fn custom_task<C: Controller>(
 ) {
     let mut tick: u8 = 0;
     let level = server.battery_service.level;
-    let current_time = server.time_service.current_time;
-    let now = CurrentTime { year: 2025, month: 6, day: 10, hour: 9, minute: 39, day_of_week: current_time::DayOfWeek::Tuesday, second: 20, fractions256: 23, adjust_reason: AdjustReason::empty() };
-
-    current_time.set(&server, &now.to_bytes()).expect("Unable to set the time");
-
     loop {
         tick = tick.wrapping_add(1);
 
