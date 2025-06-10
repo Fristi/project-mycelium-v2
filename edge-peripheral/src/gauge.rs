@@ -6,27 +6,12 @@ use embedded_hal_bus::i2c::RefCellDevice;
 use esp_hal::{analog::adc::AdcChannel, gpio::Output, i2c::master::I2c, Blocking};
 
 use crate::battery::BatteryMeasurement;
+use crate::types::Measurement;
 
 pub struct Gauge<'a, P : AdcChannel> {
     i2c: RefCell<I2c<'a, Blocking>>,
     pcb_pwr: Output<'a>,
     bm: BatteryMeasurement<'a, P>
-}
-
-pub struct Measurement {
-    pub battery: u8,
-    pub lux: f32,
-    pub temperature: f32,
-    pub humidity: f32
-}
-
-impl Measurement {
-    const DEVIATION: Measurement = Measurement {
-        battery: 1,
-        lux: 50.0,
-        temperature: 1.0,
-        humidity: 1.0
-    };
 }
 
 impl <'a, P : AdcChannel> Gauge<'a, P> {

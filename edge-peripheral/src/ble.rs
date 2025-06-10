@@ -2,6 +2,7 @@ use embassy_futures::join::join;
 use embassy_futures::select::select;
 use embassy_time::Timer;
 use defmt::{info, warn, Debug2Format};
+use esp_hal::rtc_cntl::Rtc;
 use trouble_host::prelude::*;
 use current_time::{AdjustReason, CurrentTime};
 
@@ -40,7 +41,7 @@ struct BatteryService {
 }
 
 /// Run the BLE stack.
-pub async fn run<C>(controller: C)
+pub async fn run<C>(controller: C, rtc: &mut Rtc<'_>)
 where
     C: Controller,
 {
@@ -73,7 +74,7 @@ where
                 Ok(conn) => {
                     info!("Got gatt connection");
                     // set up tasks when the connection is established to a central, so they don't run when no one is connected.
-                    let a = gatt_events_task(&server, &conn);
+                    let a = gatt_events_task(&server, &conn, rtc);
                     let b = custom_task(&server, &conn, &stack);
                     // run until any task ends (usually because the connection has been closed),
                     // then return to advertising state.
@@ -105,7 +106,7 @@ async fn ble_task<C: Controller>(mut runner: Runner<'_, C>) {
 ///
 /// This function will handle the GATT events and process them.
 /// This is how we interact with read and write requests.
-async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>) -> Result<(), Error> {
+async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rtc: &mut Rtc<'_>) -> Result<(), Error> {
     let level = server.battery_service.level;
     let current_time = server.time_service.current_time;
     let reason = loop {
@@ -121,8 +122,13 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>) ->
                         }
 
                         if(event.handle() == current_time.handle) {
-                            let value = server.get(&current_time);
-                            info!("[gatt] Read Event to curren time Characteristic: {:?}", value);
+                            // let ct = CurrentTime::from_naivedatetime(rtc.current_time());
+
+                            let now = rtc.current_time();
+                            let ct = CurrentTime::from_naivedatetime(now);
+                            let value = ct.to_bytes();
+                            current_time.set(&server, &value).expect("Unable to set the time");
+                            info!("[gatt] Read Event to curren time Characteristic: {:?}", Debug2Format(&now));
                         }
                     }
                     GattEvent::Write(event) => {
@@ -135,7 +141,7 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>) ->
                             let ct = CurrentTime::from_bytes(&bytes);
                             info!("[gatt] Write Event to current time Characteristic: {:?}", Debug2Format(&ct));
 
-                            current_time.set(&server, &ct.to_bytes()).expect("Unable to set the time");
+                            rtc.set_current_time(ct.to_naivedatetime());
                         }
                     }
                 };
@@ -191,27 +197,13 @@ async fn advertise<'values, 'server, C: Controller>(
 async fn custom_task<C: Controller>(
     server: &Server<'_>,
     conn: &GattConnection<'_, '_>,
-    stack: &Stack<'_, C,>,
+    stack: &Stack<'_, C,>
 ) {
-    let mut tick: u8 = 0;
-    let level = server.battery_service.level;
+    let current_time = server.time_service.current_time;
     loop {
-        tick = tick.wrapping_add(1);
 
-
-
-        info!("[custom_task] notifying connection of tick {}", tick);
-        if level.notify(conn, &tick).await.is_err() {
-            info!("[custom_task] error notifying connection");
-            break;
-        };
-        // read RSSI (Received Signal Strength Indicator) of the connection.
-        if let Ok(rssi) = conn.raw().rssi(stack).await {
-            info!("[custom_task] RSSI: {:?}", rssi);
-        } else {
-            info!("[custom_task] error getting RSSI");
-            break;
-        };
-        Timer::after_secs(2).await;
+        // let ct = CurrentTime::from_naivedatetime(rtc.current_time());
+        // current_time.set(&server, &ct.to_bytes()).expect("Unable to set the time");
+        Timer::after_secs(1).await;
     }
 }

@@ -4,10 +4,13 @@
 pub mod ble;
 pub mod battery;
 pub mod gauge;
+pub mod types;
 
 use core::cell::RefCell;
 
 use bt_hci::controller::ExternalController;
+use critical_section::Mutex;
+use current_time::CurrentTime;
 use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_hal::gpio::{Output, OutputConfig};
 use defmt::{error, info, flush};
@@ -27,13 +30,11 @@ use gauge::Gauge;
 use heapless::Vec;
 use timeseries::{Series, Deviate};
 use esp_println as _;
-use esp_println::println;
 
-use crate::battery::BatteryMeasurement;
-use crate::gauge::Measurement;
+use crate::types::DeviceState;
 
 #[ram(rtc_fast)]
-static mut MEASUREMENTS: Vec<Measurement, 10> = Vec::<Measurement, 10>::new();
+static mut STATE: Mutex<RefCell<DeviceState>> = Mutex::new(RefCell::new(DeviceState::new()));
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
@@ -70,7 +71,7 @@ async fn main(_spawner: Spawner) {
     // let mut cfg = RtcSleepConfig::deep();
     // cfg.set_rtc_fastmem_pd_en(false);
     // let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10));
-    // let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut rtc = Rtc::new(peripherals.LPWR);
     // rtc.rwdt.enable();
 
     let timer0 = TimerGroup::new(peripherals.TIMG1);
@@ -95,7 +96,7 @@ async fn main(_spawner: Spawner) {
     let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth);
     let controller: ExternalController<_, 20> = ExternalController::new(connector);
 
-    ble::run(controller).await;
+    ble::run(controller, &mut rtc).await;
 
     
     
@@ -147,23 +148,13 @@ async fn main(_spawner: Spawner) {
     loop {}
 }
 
-#[embassy_executor::task]
-async fn ble_embassy_task(
-    init: &'static EspWifiController<'static>,
-    bt: BT
-) {
-    let connector = BleConnector::new(&init, bt);
-    let controller: ExternalController<_, 20> = ExternalController::new(connector);
+// #[embassy_executor::task]
+// async fn ble_embassy_task(
+//     init: &'static EspWifiController<'static>,
+//     bt: BT
+// ) {
+//     let connector = BleConnector::new(&init, bt);
+//     let controller: ExternalController<_, 20> = ExternalController::new(connector);
 
-    ble::run(controller).await;
-}
-
-impl Deviate for Measurement {
-    fn deviate(&self, other: &Self, max_deviation: &Self) -> bool {
-        return 
-            self.battery - other.battery > max_deviation.battery ||
-            self.lux - other.lux > max_deviation.lux ||
-            self.temperature - other.temperature > max_deviation.temperature ||
-            self.humidity - other.humidity > max_deviation.humidity;
-    }
-}
+//     ble::run(controller).await;
+// }
