@@ -42,7 +42,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           name: Backend Nextest Results
-          files: backend/target/nextest/ci/junit.xml
+          files: target/nextest/ci/junit.xml
           disable_search: true
           fail_ci_if_error: true
       - name: Create code coverage report
@@ -52,6 +52,6 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           name: Backend Nextest Coverage
-          files: backend/target/llvm-cov-target/codecov.json
+          files: target/llvm-cov-target/codecov.json
           disable_search: true
           fail_ci_if_error: true
