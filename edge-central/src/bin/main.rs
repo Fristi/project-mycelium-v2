@@ -65,20 +65,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
             });
 
             if let Some(charac) = characteristic {
-                let now = Utc::now().naive_utc();
-                // Read current time from device
-                match peripheral.read(charac).await {
-                    Ok(data) => {
-                        let bytes = data.try_into().expect("Unable to convert");
-                        let current_time = CurrentTime::from_bytes(&bytes);
-                        let datetime = current_time.to_naivedatetime();                    
+                // let now = Utc::now().naive_utc();
+                // // Read current time from device
+                // match peripheral.read(charac).await {
+                //     Ok(data) => {
+                //         let bytes = data.try_into().expect("Unable to convert");
+                //         let current_time = CurrentTime::from_bytes(&bytes);
+                //         let datetime = current_time.to_naivedatetime();                    
 
-                        let duration = now - datetime;
-                        println!("Time drift: {:?}", duration);
-                        println!("Here: {:?}, Device: {:?}", now, datetime);
-                    },
-                    Err(e) => println!("Failed to read time: {}", e),
-                }
+                //         let duration = now - datetime;
+                //         println!("Time drift: {:?}", duration);
+                //         println!("Here: {:?}, Device: {:?}", now, datetime);
+                //     },
+                //     Err(e) => println!("Failed to read time: {}", e),
+                // }
 
                 let now = Utc::now();
                 let ts = now.timestamp();
@@ -86,7 +86,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let ct = CurrentTime::from_naivedatetime(Utc::now().naive_utc());
 
                 let bytes = ct.to_bytes();
-                match peripheral.write(charac, &bytes, WriteType::WithResponse).await {
+                match peripheral.write(charac, &bytes, WriteType::WithoutResponse).await {
                     Ok(_) => println!("Updated device time to: {}", now),
                     Err(e) => println!("Failed to write time: {}", e),
                 }

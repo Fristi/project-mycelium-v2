@@ -122,12 +122,9 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rt
                         }
 
                         if(event.handle() == current_time.handle) {
-                            // let ct = CurrentTime::from_naivedatetime(rtc.current_time());
-
                             let now = rtc.current_time();
                             let ct = CurrentTime::from_naivedatetime(now);
-                            let value = ct.to_bytes();
-                            current_time.set(&server, &value).expect("Unable to set the time");
+                            current_time.set(&server, &ct.to_bytes()).expect("Unable to set the time");
                             info!("[gatt] Read Event to curren time Characteristic: {:?}", Debug2Format(&now));
                         }
                     }
@@ -140,7 +137,6 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rt
                             let bytes = event.data().try_into().expect("Unable to convert");
                             let ct = CurrentTime::from_bytes(&bytes);
                             info!("[gatt] Write Event to current time Characteristic: {:?}", Debug2Format(&ct));
-
                             rtc.set_current_time(ct.to_naivedatetime());
                         }
                     }
@@ -197,13 +193,27 @@ async fn advertise<'values, 'server, C: Controller>(
 async fn custom_task<C: Controller>(
     server: &Server<'_>,
     conn: &GattConnection<'_, '_>,
-    stack: &Stack<'_, C,>
+    stack: &Stack<'_, C,>,
 ) {
-    let current_time = server.time_service.current_time;
+    let mut tick: u8 = 0;
+    let level = server.battery_service.level;
     loop {
+        tick = tick.wrapping_add(1);
 
-        // let ct = CurrentTime::from_naivedatetime(rtc.current_time());
-        // current_time.set(&server, &ct.to_bytes()).expect("Unable to set the time");
-        Timer::after_secs(1).await;
+
+
+        info!("[custom_task] notifying connection of tick {}", tick);
+        if level.notify(conn, &tick).await.is_err() {
+            info!("[custom_task] error notifying connection");
+            break;
+        };
+        // read RSSI (Received Signal Strength Indicator) of the connection.
+        if let Ok(rssi) = conn.raw().rssi(stack).await {
+            info!("[custom_task] RSSI: {:?}", rssi);
+        } else {
+            info!("[custom_task] error getting RSSI");
+            break;
+        };
+        Timer::after_secs(2).await;
     }
 }

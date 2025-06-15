@@ -8,7 +8,7 @@ version = "0.1.0"
 nb = "1.1.0"
 shtcx = { git = "https://github.com/Fristi/shtcx-rs", rev = "d733731ff1e439459a8357310c85439ef9f64898" }
 bh1730fvc = { git = "https://github.com/Fristi/bh1730fvc-rs", rev = "dff319f4aae9da82dcea45c1f2b2ecd347da31c9" }
-timeseries = { git = "https://github.com/Fristi/timeseries", rev = "ca2808e7fef75f641ef82f50168ca0a1bc5e5c08" }
+timeseries = { git = "https://github.com/Fristi/timeseries", rev = "3e5ac883c5236fa5cf6ac1dab5451d268013d13b" }
 current-time = { path = "../current-time" }
 bt-hci = { version = "0.2.1", features = ["defmt"] }
 trouble-host = { version = "0.1.0", features = ["defmt", "gatt", "peripheral", "l2cap-tx-packet-pool-size-3"] }
@@ -53,9 +53,6 @@ static_cell = { version = "2.1.0", features = ["nightly"] }
 prost = { version = "0.13.5", default-features = false, features = ["derive"] }
 prost-types = { version = "0.13.5", default-features = false }
 embassy-sync = { version = "0.6.2", features = ["defmt"] }
-
-[profile.dev.package.esp-storage]
-opt-level = 3
 
 [profile.dev]
 # Rust debug is too slow.
