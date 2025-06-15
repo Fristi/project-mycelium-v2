@@ -23,7 +23,7 @@ jobs:
           rustup default nightly
       - name: Install dependencies
         shell: bash
-        run: sudo apt-get update && sudo apt-get install -y dbus-1
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-3
       - name: Cargo cache
         uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
         with:
