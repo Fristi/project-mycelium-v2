@@ -10,8 +10,8 @@ shtcx = { git = "https://github.com/Fristi/shtcx-rs", rev = "d733731ff1e439459a8
 bh1730fvc = { git = "https://github.com/Fristi/bh1730fvc-rs", rev = "dff319f4aae9da82dcea45c1f2b2ecd347da31c9" }
 timeseries = { git = "https://github.com/Fristi/timeseries", rev = "ca2808e7fef75f641ef82f50168ca0a1bc5e5c08" }
 current-time = { path = "../current-time" }
-bt-hci = { version = "0.2.1", features = ["defmt"] }
-trouble-host = { version = "0.1.0", features = ["defmt", "gatt", "peripheral", "l2cap-tx-packet-pool-size-3"] }
+bt-hci = { version = "0.3.2", features = ["defmt"] }
+trouble-host = { version = "0.2.0", features = ["defmt", "gatt", "peripheral"] }
 critical-section = "1.2.0"
 defmt = "1.0.1"
 embassy-executor = { version = "0.7.0", features = [
@@ -26,8 +26,8 @@ embedded-hal = "1.0.0"
 embedded-hal-bus = { version = "0.3.0", features = [] }
 chrono = { version = "0.4.41", default-features = false }
 embedded-hal-async = "1.0.0"
-esp-alloc = "0.7.0"
-esp-backtrace = { version = "0.15.1", features = [
+esp-alloc = "0.8.0"
+esp-backtrace = { version = "0.16.0", features = [
   "defmt",
   "esp32",
   "exception-handler",
@@ -39,9 +39,9 @@ esp-hal = { version = "1.0.0-beta.0", features = [
   "unstable",
 ] }
 
-esp-hal-embassy = { version = "0.7.0", features = ["esp32"] }
-esp-println = { version = "0.13.0", features = ["defmt-espflash", "esp32"] }
-esp-wifi = { version = "0.13.0", features = [
+esp-hal-embassy = { version = "0.8.1", features = ["esp32"] }
+esp-println = { version = "0.14.0", features = ["defmt-espflash", "esp32"] }
+esp-wifi = { version = "0.14.1", features = [
   "ble",
   "builtin-scheduler",
   "defmt",
@@ -50,9 +50,7 @@ esp-wifi = { version = "0.13.0", features = [
 ] }
 heapless = { version = "0.8.0", default-features = false }
 static_cell = { version = "2.1.0", features = ["nightly"] }
-prost = { version = "0.13.5", default-features = false, features = ["derive"] }
-prost-types = { version = "0.13.5", default-features = false }
-embassy-sync = { version = "0.6.2", features = ["defmt"] }
+embassy-sync = { version = "0.7", features = ["defmt"] }
 
 [profile.dev.package.esp-storage]
 opt-level = 3
