@@ -65,24 +65,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
             });
 
             if let Some(charac) = characteristic {
-                let now = Utc::now();
+                let now = Utc::now().naive_utc();
                 // Read current time from device
                 match peripheral.read(charac).await {
                     Ok(data) => {
                         let bytes = data.try_into().expect("Unable to convert");
                         let current_time = CurrentTime::from_bytes(&bytes);
-                        if let Some((secs, nsecs)) = current_time.to_unix_timestamp() {
-                            match DateTime::from_timestamp(secs, nsecs) {
-                                Some(time) => {
-                                    let duration = now - time;
+                        let datetime = current_time.to_naivedatetime();                    
 
-                                    println!("Time drift: {:?}", duration);
-                                    println!("Here: {:?}, Device: {:?}", now, time);
-
-                                },
-                                None => ()
-                            }
-                        }                        
+                        let duration = now - datetime;
+                        println!("Time drift: {:?}", duration);
+                        println!("Here: {:?}, Device: {:?}", now, datetime);
                     },
                     Err(e) => println!("Failed to read time: {}", e),
                 }
@@ -90,14 +83,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let now = Utc::now();
                 let ts = now.timestamp();
 
-                let current_time = CurrentTime::from_unix_timestamp(ts);
+                let ct = CurrentTime::from_naivedatetime(Utc::now().naive_utc());
 
-                if let Some(ct) = current_time {
-                    let bytes = ct.to_bytes();
-                    match peripheral.write(charac, &bytes, WriteType::WithResponse).await {
-                        Ok(_) => println!("Updated device time to: {}", now),
-                        Err(e) => println!("Failed to write time: {}", e),
-                    }
+                let bytes = ct.to_bytes();
+                match peripheral.write(charac, &bytes, WriteType::WithResponse).await {
+                    Ok(_) => println!("Updated device time to: {}", now),
+                    Err(e) => println!("Failed to write time: {}", e),
                 }
             }
 
