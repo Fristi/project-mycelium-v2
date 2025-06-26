@@ -1,6 +1,7 @@
+use chrono::DateTime;
+use current_time::CurrentTime;
 use embassy_futures::join::join;
-use embassy_futures::select::select;
-use embassy_time::Timer;
+use esp_hal::rtc_cntl::Rtc;
 use trouble_host::prelude::*;
 use defmt::*;
 
@@ -10,26 +11,21 @@ const CONNECTIONS_MAX: usize = 1;
 /// Max number of L2CAP channels.
 const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
 
+/// Time service
+#[gatt_service(uuid = service::CURRENT_TIME)]
+struct TimeService {
+    #[characteristic(uuid = characteristic::CURRENT_TIME, write, read)]
+    current_time: [u8; 10]
+}
+
 // GATT Server definition
 #[gatt_server]
 struct Server {
-    battery_service: BatteryService,
-}
-
-/// Battery service
-#[gatt_service(uuid = service::BATTERY)]
-struct BatteryService {
-    /// Battery Level
-    #[descriptor(uuid = descriptors::VALID_RANGE, read, value = [0, 100])]
-    #[descriptor(uuid = descriptors::MEASUREMENT_DESCRIPTION, name = "hello", read, value = "Battery Level")]
-    #[characteristic(uuid = characteristic::BATTERY_LEVEL, read, notify, value = 10)]
-    level: u8,
-    #[characteristic(uuid = "408813df-5dd4-1f87-ec11-cdb001100000", write, read, notify)]
-    status: bool,
+    time_service: TimeService
 }
 
 /// Run the BLE stack.
-pub async fn run<C>(controller: C)
+pub async fn run<C>(controller: C, rtc: &mut Rtc<'_>)
 where
     C: Controller,
 {
@@ -53,14 +49,9 @@ where
 
     let _ = join(ble_task(runner), async {
         loop {
-            match advertise("Trouble Example", &mut peripheral, &server).await {
+            match advertise("Mycelium", &mut peripheral, &server).await {
                 Ok(conn) => {
-                    // set up tasks when the connection is established to a central, so they don't run when no one is connected.
-                    let a = gatt_events_task(&server, &conn);
-                    let b = custom_task(&server, &conn, &stack);
-                    // run until any task ends (usually because the connection has been closed),
-                    // then return to advertising state.
-                    select(a, b).await;
+                    gatt_events_task(&server, &conn, rtc).await.expect("Failed to handle GATT events");
                 }
                 Err(e) => {
                     defmt::panic!("[adv] error: {:?}", Debug2Format(&e));
@@ -71,21 +62,6 @@ where
     .await;
 }
 
-/// This is a background task that is required to run forever alongside any other BLE tasks.
-///
-/// ## Alternative
-///
-/// If you didn't require this to be generic for your application, you could statically spawn this with i.e.
-///
-/// ```rust,ignore
-///
-/// #[embassy_executor::task]
-/// async fn ble_task(mut runner: Runner<'static, SoftdeviceController<'static>>) {
-///     runner.run().await;
-/// }
-///
-/// spawner.must_spawn(ble_task(runner));
-/// ```
 async fn ble_task<C: Controller, P: PacketPool>(mut runner: Runner<'_, C, P>) {
     loop {
         if let Err(e) = runner.run().await {
@@ -98,22 +74,32 @@ async fn ble_task<C: Controller, P: PacketPool>(mut runner: Runner<'_, C, P>) {
 ///
 /// This function will handle the GATT events and process them.
 /// This is how we interact with read and write requests.
-async fn gatt_events_task<P: PacketPool>(server: &Server<'_>, conn: &GattConnection<'_, '_, P>) -> Result<(), Error> {
-    let level = server.battery_service.level;
+async fn gatt_events_task<P: PacketPool>(server: &Server<'_>, conn: &GattConnection<'_, '_, P>, rtc: &mut Rtc<'_>) -> Result<(), Error> {
+    let current_time = server.time_service.current_time;
     let reason = loop {
         match conn.next().await {
             GattConnectionEvent::Disconnected { reason } => break reason,
             GattConnectionEvent::Gatt { event } => {
                 match &event {
                     GattEvent::Read(event) => {
-                        if event.handle() == level.handle {
-                            let value = server.get(&level);
+                        if event.handle() == current_time.handle {
+                            let ct = CurrentTime::from_naivedatetime(
+                                DateTime::from_timestamp_nanos((rtc.current_time_us() as i64) * 1000)
+                                    .naive_local(),
+                            );
+                            let bytes = ct.to_bytes();
+                            server
+                                .set(&current_time, &bytes)
+                                .expect("Failed to set current time");
+                            let value = server.get(&current_time);
                             info!("[gatt] Read Event to Level Characteristic: {:?}", value);
                         }
                     }
                     GattEvent::Write(event) => {
-                        if event.handle() == level.handle {
-                            info!("[gatt] Write Event to Level Characteristic: {:?}", event.data());
+                        if event.handle() == current_time.handle {
+                            let current_time = CurrentTime::from_bytes(event.data());
+                            let ts = current_time.to_naivedatetime().expect("Conversion to NaiveDateTime failed").and_utc().timestamp();
+                            rtc.set_current_time_us(ts as u64);
                         }
                     }
                     _ => {}
@@ -142,7 +128,7 @@ async fn advertise<'values, 'server, C: Controller>(
     let len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::ServiceUuids16(&[[0x0f, 0x18]]),
+            AdStructure::ServiceUuids16(&[[0x05, 0x18]]),
             AdStructure::CompleteLocalName(name.as_bytes()),
         ],
         &mut advertiser_data[..],
@@ -160,33 +146,4 @@ async fn advertise<'values, 'server, C: Controller>(
     let conn = advertiser.accept().await?.with_attribute_server(server)?;
     info!("[adv] connection established");
     Ok(conn)
-}
-
-/// Example task to use the BLE notifier interface.
-/// This task will notify the connected central of a counter value every 2 seconds.
-/// It will also read the RSSI value every 2 seconds.
-/// and will stop when the connection is closed by the central or an error occurs.
-async fn custom_task<C: Controller, P: PacketPool>(
-    server: &Server<'_>,
-    conn: &GattConnection<'_, '_, P>,
-    stack: &Stack<'_, C, P>,
-) {
-    let mut tick: u8 = 0;
-    let level = server.battery_service.level;
-    loop {
-        tick = tick.wrapping_add(1);
-        info!("[custom_task] notifying connection of tick {}", tick);
-        if level.notify(conn, &tick).await.is_err() {
-            info!("[custom_task] error notifying connection");
-            break;
-        };
-        // read RSSI (Received Signal Strength Indicator) of the connection.
-        if let Ok(rssi) = conn.raw().rssi(stack).await {
-            info!("[custom_task] RSSI: {:?}", rssi);
-        } else {
-            info!("[custom_task] error getting RSSI");
-            break;
-        };
-        Timer::after_secs(2).await;
-    }
 }

@@ -1491,7 +1491,7 @@ dependencies = [
 [[package]]
 name = "timeseries"
 version = "0.1.0"
-source = "git+https://github.com/Fristi/timeseries?rev=ca2808e7fef75f641ef82f50168ca0a1bc5e5c08#ca2808e7fef75f641ef82f50168ca0a1bc5e5c08"
+source = "git+https://github.com/Fristi/timeseries?rev=3e5ac883c5236fa5cf6ac1dab5451d268013d13b#3e5ac883c5236fa5cf6ac1dab5451d268013d13b"
 dependencies = [
  "heapless 0.7.17",
 ]

@@ -92,11 +92,11 @@ impl CurrentTime {
         }
     }
 
-    pub fn to_naivedatetime(&self) -> NaiveDateTime {
-        let date = NaiveDate::from_ymd_opt(self.year as i32, self.month as u32, self.day as u32).expect("Unable to create date");
-        let time = NaiveTime::from_hms_opt(self.hour as u32, self.minute as u32, self.second as u32).expect("Unable to create time");
+    pub fn to_naivedatetime(&self) -> Result<NaiveDateTime, &'static str> {
+        let date = NaiveDate::from_ymd_opt(self.year as i32, self.month as u32, self.day as u32).ok_or("Unable to create date")?;
+        let time = NaiveTime::from_hms_opt(self.hour as u32, self.minute as u32, self.second as u32).ok_or("Unable to create time")?;
 
-        NaiveDateTime::new(date, time)
+        Ok(NaiveDateTime::new(date, time))
     }
     
     pub fn to_bytes(&self) -> [u8; 10] {
@@ -115,7 +115,7 @@ impl CurrentTime {
         ]
     }
 
-    pub fn from_bytes(bytes: &[u8; 10]) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
         let year = u16::from_le_bytes([bytes[0], bytes[1]]);
         let month = bytes[2];
         let day = bytes[3];
