@@ -81,8 +81,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
 
                 let now = Utc::now();
-                let ts = now.timestamp();
-
                 let ct = CurrentTime::from_naivedatetime(Utc::now().naive_utc());
 
                 let bytes = ct.to_bytes();
