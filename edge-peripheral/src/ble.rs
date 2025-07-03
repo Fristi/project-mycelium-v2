@@ -4,7 +4,7 @@ use embassy_time::Timer;
 use defmt::{info, warn, Debug2Format};
 use esp_hal::rtc_cntl::Rtc;
 use trouble_host::prelude::*;
-use current_time::{AdjustReason, CurrentTime};
+use edge_protocol::{AdjustReason, CurrentTime};
 
 /// Max number of connections
 const CONNECTIONS_MAX: usize = 1;
@@ -137,7 +137,7 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rt
                         }
 
                         if event.handle() == current_time.handle {
-                            let bytes = event.data().try_into().expect("Unable to convert");
+                            let bytes = event.data();
                             let ct = CurrentTime::from_bytes(&bytes);
                             info!("[gatt] Write Event to current time Characteristic: {:?}", Debug2Format(&ct));
 

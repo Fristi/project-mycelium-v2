@@ -115,7 +115,7 @@ impl CurrentTime {
         ]
     }
 
-    pub fn from_bytes(bytes: &[u8; 10]) -> Self {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
         let year = u16::from_le_bytes([bytes[0], bytes[1]]);
         let month = bytes[2];
         let day = bytes[3];

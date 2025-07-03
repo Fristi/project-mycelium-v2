@@ -1,5 +1,5 @@
 use heapless::Vec;
-use current_time::CurrentTime;
+use edge_protocol::CurrentTime;
 use timeseries::Deviate;
 
 
@@ -30,16 +30,7 @@ impl Deviate for Measurement {
     }
 }
 
-pub struct DeviceState {
-    pub current_time: CurrentTime,
-    pub measurements: Vec<Measurement, 10>
-}
-
-impl DeviceState {
-    pub const fn new() -> Self {
-        Self {
-            current_time: CurrentTime::unix_epoch(),
-            measurements: Vec::new()
-        }
-    }
+pub enum DeviceState {
+    AwaitingTimeSync,
+    Buffering(Vec<Measurement, 10>),
 }

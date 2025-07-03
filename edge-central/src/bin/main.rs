@@ -1,13 +1,11 @@
 use btleplug::api::bleuuid::uuid_from_u16;
-use btleplug::api::{Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType, ValueNotification};
-use btleplug::platform::{Adapter, Manager};
+use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter, WriteType};
+use btleplug::platform::Manager;
 use uuid::Uuid;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::Utc;
 use tokio::time::{sleep, Duration};
-use std::alloc::System;
 use std::error::Error;
-use std::time::SystemTime;
-use current_time::CurrentTime;
+use edge_protocol::CurrentTime;
 
 const CURRENT_TIME_SERVICE_UUID: Uuid = uuid_from_u16(0x1805);
 const CURRENT_TIME_CHAR_UUID: Uuid = uuid_from_u16(0x2a2b);
@@ -69,8 +67,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 // Read current time from device
                 match peripheral.read(charac).await {
                     Ok(data) => {
-                        let bytes = data.try_into().expect("Unable to convert");
-                        let current_time = CurrentTime::from_bytes(&bytes);
+                        let bytes = data.as_slice();
+                        let current_time = CurrentTime::from_bytes(bytes);
                         let datetime = current_time.to_naivedatetime();                    
 
                         let duration = now - datetime;

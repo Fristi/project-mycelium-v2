@@ -10,7 +10,7 @@ use core::cell::RefCell;
 
 use bt_hci::controller::ExternalController;
 use critical_section::Mutex;
-use current_time::CurrentTime;
+use edge_protocol::CurrentTime;
 use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_hal::gpio::{Output, OutputConfig};
 use defmt::{error, info, flush};
@@ -34,7 +34,7 @@ use esp_println as _;
 use crate::types::DeviceState;
 
 #[ram(rtc_fast)]
-static mut STATE: Mutex<RefCell<DeviceState>> = Mutex::new(RefCell::new(DeviceState::new()));
+static mut STATE: Mutex<RefCell<DeviceState>> = Mutex::new(RefCell::new(DeviceState::AwaitingTimeSync));
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
