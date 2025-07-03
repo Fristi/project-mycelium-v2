@@ -4,6 +4,206 @@
 use bitflags::bitflags;
 use chrono::prelude::*;
 
+pub struct MeasurementSerieEntry {
+    pub timestamp: NaiveDateTime,
+    pub measurement: Measurement
+}
+
+impl MeasurementSerieEntry {
+    /// Encode measurement series entry to TLV format
+    pub fn to_tlv(&self) -> [u8; 33] {
+        let mut tlv = [0u8; 33];
+        let mut index = 0;
+        
+        // Timestamp (Type: 1) - 8 bytes for i64 timestamp
+        tlv[index] = 1; // Type
+        index += 1;
+        tlv[index] = 8; // Length
+        index += 1;
+        let timestamp_bytes = self.timestamp.and_utc().timestamp().to_le_bytes();
+        tlv[index..index + 8].copy_from_slice(&timestamp_bytes);
+        index += 8;
+        
+        // Measurement (Type: 2) - 21 bytes for measurement
+        tlv[index] = 2; // Type
+        index += 1;
+        tlv[index] = 21; // Length
+        index += 1;
+        tlv[index..index + 21].copy_from_slice(&self.measurement.to_tlv());
+        
+        tlv
+    }
+    
+    /// Decode measurement series entry from TLV format
+    pub fn from_tlv(data: &[u8]) -> Result<Self, &'static str> {
+        let mut index = 0;
+        let mut timestamp = None;
+        let mut measurement = None;
+        
+        while index < data.len() {
+            if index + 1 >= data.len() {
+                return Err("Incomplete TLV data");
+            }
+            
+            let tlv_type = data[index];
+            index += 1;
+            let length = data[index] as usize;
+            index += 1;
+            
+            if index + length > data.len() {
+                return Err("TLV length exceeds data bounds");
+            }
+            
+            let value = &data[index..index + length];
+            
+            match tlv_type {
+                1 => { // Timestamp
+                    if length != 8 {
+                        return Err("Invalid timestamp length");
+                    }
+                    let timestamp_i64 = i64::from_le_bytes([
+                        value[0], value[1], value[2], value[3],
+                        value[4], value[5], value[6], value[7]
+                    ]);
+                    timestamp = Some(DateTime::from_timestamp(timestamp_i64, 0)
+                        .ok_or("Invalid timestamp")?.naive_utc());
+                }
+                2 => { // Measurement
+                    if length != 21 {
+                        return Err("Invalid measurement length");
+                    }
+                    measurement = Some(Measurement::from_tlv(value)?);
+                }
+                _ => {
+                    return Err("Unknown TLV type");
+                }
+            }
+            
+            index += length;
+        }
+        
+        let timestamp = timestamp.ok_or("Missing timestamp")?;
+        let measurement = measurement.ok_or("Missing measurement")?;
+        
+        Ok(MeasurementSerieEntry {
+            timestamp,
+            measurement
+        })
+    }
+}
+
+
+
+pub struct Measurement {
+    pub battery: u8,
+    pub lux: f32,
+    pub temperature: f32,
+    pub humidity: f32
+}
+
+impl Measurement {
+    /// Encode measurement to TLV format
+    pub fn to_tlv(&self) -> [u8; 21] {
+        let mut tlv = [0u8; 21];
+        let mut index = 0;
+        
+        // Battery (Type: 1)
+        tlv[index] = 1; // Type
+        index += 1;
+        tlv[index] = 1; // Length
+        index += 1;
+        tlv[index] = self.battery;
+        index += 1;
+        
+        // Lux (Type: 2)
+        tlv[index] = 2; // Type
+        index += 1;
+        tlv[index] = 4; // Length
+        index += 1;
+        tlv[index..index + 4].copy_from_slice(&self.lux.to_le_bytes());
+        index += 4;
+        
+        // Temperature (Type: 3)
+        tlv[index] = 3; // Type
+        index += 1;
+        tlv[index] = 4; // Length
+        index += 1;
+        tlv[index..index + 4].copy_from_slice(&self.temperature.to_le_bytes());
+        index += 4;
+        
+        // Humidity (Type: 4)
+        tlv[index] = 4; // Type
+        index += 1;
+        tlv[index] = 4; // Length
+        index += 1;
+        tlv[index..index + 4].copy_from_slice(&self.humidity.to_le_bytes());
+        
+        tlv
+    }
+    
+    /// Decode measurement from TLV format
+    pub fn from_tlv(data: &[u8]) -> Result<Self, &'static str> {
+        let mut measurement = Measurement {
+            battery: 0,
+            lux: 0.0,
+            temperature: 0.0,
+            humidity: 0.0,
+        };
+        
+        let mut i = 0;
+        while i < data.len() {
+            if i + 2 > data.len() {
+                return Err("Incomplete TLV header");
+            }
+            
+            let tlv_type = data[i];
+            let length = data[i + 1] as usize;
+            
+            if i + 2 + length > data.len() {
+                return Err("Incomplete TLV data");
+            }
+            
+            let value_data = &data[i + 2..i + 2 + length];
+            
+            match tlv_type {
+                1 => { // Battery
+                    if length != 1 {
+                        return Err("Invalid battery length");
+                    }
+                    measurement.battery = value_data[0];
+                },
+                2 => { // Lux
+                    if length != 4 {
+                        return Err("Invalid lux length");
+                    }
+                    measurement.lux = f32::from_le_bytes([value_data[0], value_data[1], value_data[2], value_data[3]]);
+                },
+                3 => { // Temperature
+                    if length != 4 {
+                        return Err("Invalid temperature length");
+                    }
+                    measurement.temperature = f32::from_le_bytes([value_data[0], value_data[1], value_data[2], value_data[3]]);
+                },
+                4 => { // Humidity
+                    if length != 4 {
+                        return Err("Invalid humidity length");
+                    }
+                    measurement.humidity = f32::from_le_bytes([value_data[0], value_data[1], value_data[2], value_data[3]]);
+                },
+                _ => return Err("Unknown TLV type"),
+            }
+            
+            i += 2 + length;
+        }
+        
+        Ok(measurement)
+    }
+}
+
+
+
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DayOfWeek {
     Unknown = 0,
@@ -220,4 +420,127 @@ mod tests {
         let decoded = CurrentTime::from_bytes(&bytes);
         assert_eq!(decoded.day_of_week, DayOfWeek::Unknown);
     }
+
+    #[test]
+    fn test_measurement_tlv_encode_decode() {
+        let measurement = Measurement {
+            battery: 85,
+            lux: 1234.56,
+            temperature: 23.5,
+            humidity: 45.2,
+        };
+        
+        let tlv_data = measurement.to_tlv();
+        let decoded = Measurement::from_tlv(&tlv_data).unwrap();
+        
+        assert_eq!(measurement.battery, decoded.battery);
+        assert!((measurement.lux - decoded.lux).abs() < f32::EPSILON);
+        assert!((measurement.temperature - decoded.temperature).abs() < f32::EPSILON);
+        assert!((measurement.humidity - decoded.humidity).abs() < f32::EPSILON);
+    }
+    
+    #[test]
+    fn test_measurement_tlv_invalid_data() {
+        // Test with incomplete data
+        let result = Measurement::from_tlv(&[1, 1]); // Missing value
+        assert!(result.is_err());
+        
+        // Test with unknown type
+        let result = Measurement::from_tlv(&[99, 1, 0]); // Unknown type 99
+        assert!(result.is_err());
+        
+        // Test with wrong length for battery
+        let result = Measurement::from_tlv(&[1, 2, 0, 0]); // Battery with length 2
+        assert!(result.is_err());
+    }
+    
+    #[test]
+    fn test_measurement_tlv_empty() {
+        let measurement = Measurement {
+            battery: 0,
+            lux: 0.0,
+            temperature: 0.0,
+            humidity: 0.0,
+        };
+        
+        let tlv_data = measurement.to_tlv();
+        let decoded = Measurement::from_tlv(&tlv_data).unwrap();
+        
+        assert_eq!(measurement.battery, decoded.battery);
+        assert_eq!(measurement.lux, decoded.lux);
+        assert_eq!(measurement.temperature, decoded.temperature);
+        assert_eq!(measurement.humidity, decoded.humidity);
+    }
+
+    #[test]
+    fn test_measurement_serie_entry_tlv_encode_decode() {
+        let measurement = Measurement {
+            battery: 75,
+            lux: 987.65,
+            temperature: 18.3,
+            humidity: 62.1,
+        };
+        
+        let entry = MeasurementSerieEntry {
+            timestamp: DateTime::from_timestamp(1640995200, 0).unwrap().naive_utc(), // 2022-01-01 00:00:00
+            measurement,
+        };
+        
+        let tlv_data = entry.to_tlv();
+        let decoded = MeasurementSerieEntry::from_tlv(&tlv_data).unwrap();
+        
+        assert_eq!(entry.timestamp, decoded.timestamp);
+        assert_eq!(entry.measurement.battery, decoded.measurement.battery);
+        assert!((entry.measurement.lux - decoded.measurement.lux).abs() < f32::EPSILON);
+        assert!((entry.measurement.temperature - decoded.measurement.temperature).abs() < f32::EPSILON);
+        assert!((entry.measurement.humidity - decoded.measurement.humidity).abs() < f32::EPSILON);
+    }
+    
+    #[test]
+    fn test_measurement_serie_entry_tlv_invalid_data() {
+        // Test with incomplete data
+        let result = MeasurementSerieEntry::from_tlv(&[1, 8]); // Missing timestamp value
+        assert!(result.is_err());
+        
+        // Test with missing measurement
+        let mut incomplete_data = [0u8; 10];
+        incomplete_data[0] = 1; // Type: timestamp
+        incomplete_data[1] = 8; // Length: 8
+        // Timestamp bytes would go here, but we're testing missing measurement
+        let result = MeasurementSerieEntry::from_tlv(&incomplete_data);
+        assert!(result.is_err());
+        
+        // Test with unknown TLV type
+        let result = MeasurementSerieEntry::from_tlv(&[99, 1, 0]); // Unknown type 99
+        assert!(result.is_err());
+        
+        // Test with wrong timestamp length
+        let result = MeasurementSerieEntry::from_tlv(&[1, 4, 0, 0, 0, 0]); // Timestamp with length 4
+        assert!(result.is_err());
+    }
+    
+    #[test]
+    fn test_measurement_serie_entry_tlv_empty_values() {
+        let measurement = Measurement {
+            battery: 0,
+            lux: 0.0,
+            temperature: 0.0,
+            humidity: 0.0,
+        };
+        
+        let entry = MeasurementSerieEntry {
+            timestamp: DateTime::from_timestamp(0, 0).unwrap().naive_utc(), // Unix epoch
+            measurement,
+        };
+        
+        let tlv_data = entry.to_tlv();
+        let decoded = MeasurementSerieEntry::from_tlv(&tlv_data).unwrap();
+        
+        assert_eq!(entry.timestamp, decoded.timestamp);
+        assert_eq!(entry.measurement.battery, decoded.measurement.battery);
+        assert_eq!(entry.measurement.lux, decoded.measurement.lux);
+        assert_eq!(entry.measurement.temperature, decoded.measurement.temperature);
+        assert_eq!(entry.measurement.humidity, decoded.measurement.humidity);
+    }
+
 }
