@@ -4,12 +4,7 @@ use timeseries::Deviate;
 
 
 
-pub struct Measurement {
-    pub battery: u8,
-    pub lux: f32,
-    pub temperature: f32,
-    pub humidity: f32
-}
+
 
 impl Measurement {
     const DEVIATION: Measurement = Measurement {
