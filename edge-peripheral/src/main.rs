@@ -33,8 +33,8 @@ use esp_println as _;
 
 use crate::types::DeviceState;
 
-#[ram(rtc_fast)]
-static mut STATE: Mutex<RefCell<DeviceState>> = Mutex::new(RefCell::new(DeviceState::AwaitingTimeSync));
+// #[ram(rtc_fast)]
+// static mut STATE: Mutex<RefCell<DeviceState>> = Mutex::new(RefCell::new(DeviceState::AwaitingTimeSync));
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {

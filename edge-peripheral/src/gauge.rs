@@ -4,9 +4,8 @@ use bh1730fvc::blocking::BH1730FVC;
 use embassy_time::{Delay, Timer};
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_hal::{analog::adc::AdcChannel, gpio::Output, i2c::master::I2c, Blocking};
-
+use edge_protocol::Measurement;
 use crate::battery::BatteryMeasurement;
-use crate::types::Measurement;
 
 pub struct Gauge<'a, P : AdcChannel> {
     i2c: RefCell<I2c<'a, Blocking>>,

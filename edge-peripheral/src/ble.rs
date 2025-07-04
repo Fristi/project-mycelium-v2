@@ -1,10 +1,13 @@
+use core::cell::UnsafeCell;
+
 use embassy_futures::join::join;
 use embassy_futures::select::select;
 use embassy_time::Timer;
 use defmt::{info, warn, Debug2Format};
 use esp_hal::rtc_cntl::Rtc;
 use trouble_host::prelude::*;
-use edge_protocol::{AdjustReason, CurrentTime};
+use edge_protocol::*;
+use heapless::Vec;
 
 /// Max number of connections
 const CONNECTIONS_MAX: usize = 1;
@@ -14,31 +17,54 @@ const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
 
 const L2CAP_MTU: usize = 255;
 
-// GATT Server definition
+// Thread-local buffer for preparing GATT data
+// struct SyncUnsafeCell<T>(UnsafeCell<T>);
+
+// unsafe impl<T> Sync for SyncUnsafeCell<T> {}
+
+// static GATT_BUFFER: SyncUnsafeCell<[u8; 198]> =
+//     SyncUnsafeCell(UnsafeCell::new([0; 198]));
+
+// pub struct MeasurementSeries(pub Vec<MeasurementSerieEntry, 6>);
+
+// impl Default for MeasurementSeries {
+//     fn default() -> Self {
+//         Self(Vec::new())
+//     }
+// }
+
+// impl AsGatt for MeasurementSeries {
+//     fn as_gatt(&self) -> &[u8] {
+//         let buffer = unsafe { &mut *GATT_BUFFER.0.get() };
+
+//         for (i, item) in self.0.iter().enumerate() {
+//             buffer[i * 33..(i + 1) * 33].copy_from_slice(&item.to_tlv());
+//         }
+
+//         unsafe { core::slice::from_raw_parts(buffer.as_ptr(), 198) }
+
+//     }
+//     const MIN_SIZE: usize = 198;
+//     const MAX_SIZE: usize = 198;
+// }
+
 #[gatt_server]
 struct Server {
-    battery_service: BatteryService,
+    // measurement_service: MeasurementService,
     time_service: TimeService
 }
 
-/// Time service
-#[gatt_service(uuid = service::CURRENT_TIME)]
+#[gatt_service(uuid = CURRENT_TIME_SERVICE_UUID)]
 struct TimeService {
-    #[characteristic(uuid = characteristic::CURRENT_TIME, write, read)]
+    #[characteristic(uuid = CURRENT_TIME_CHARACTERISTIC_UUID, write, read)]
     current_time: [u8; 10]
 }
 
-/// Battery service
-#[gatt_service(uuid = service::BATTERY)]
-struct BatteryService {
-    /// Battery Level
-    #[descriptor(uuid = descriptors::VALID_RANGE, read, value = [0, 100])]
-    #[descriptor(uuid = descriptors::MEASUREMENT_DESCRIPTION, name = "hello", read, value = "Battery Level")]
-    #[characteristic(uuid = characteristic::BATTERY_LEVEL, read, notify, value = 10)]
-    level: u8,
-    #[characteristic(uuid = "408813df-5dd4-1f87-ec11-cdb001100000", write, read, notify)]
-    status: bool,
-}
+// #[gatt_service(uuid = MEASUREMENT_SERVICE_UUID)]
+// struct MeasurementService {
+//     #[characteristic(uuid = MEASUREMENT_CHARACTERISTIC_UUID, read)]
+//     measurement: MeasurementSeries
+// }
 
 /// Run the BLE stack.
 pub async fn run<C>(controller: C, rtc: &mut Rtc<'_>)
@@ -107,7 +133,6 @@ async fn ble_task<C: Controller>(mut runner: Runner<'_, C>) {
 /// This function will handle the GATT events and process them.
 /// This is how we interact with read and write requests.
 async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rtc: &mut Rtc<'_>) -> Result<(), Error> {
-    let level = server.battery_service.level;
     let current_time = server.time_service.current_time;
     let reason = loop {
         match conn.next().await {
@@ -116,10 +141,7 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rt
             GattConnectionEvent::Gatt { event: Ok(event) } => {
                 match &event {
                     GattEvent::Read(event) => {
-                        if event.handle() == level.handle {
-                            let value = server.get(&level);
-                            info!("[gatt] Read Event to Level Characteristic: {:?}", value);
-                        }
+     
 
                         if(event.handle() == current_time.handle) {
                             // let ct = CurrentTime::from_naivedatetime(rtc.current_time());
@@ -132,9 +154,7 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rt
                         }
                     }
                     GattEvent::Write(event) => {
-                        if event.handle() == level.handle {
-                            info!("[gatt] Write Event to Level Characteristic: {:?}", event.data());
-                        }
+
 
                         if event.handle() == current_time.handle {
                             let bytes = event.data();
@@ -170,7 +190,7 @@ async fn advertise<'values, 'server, C: Controller>(
     let len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::ServiceUuids16(&[[0x05, 0x18]]),
+            AdStructure::ServiceUuids128(&[CURRENT_TIME_SERVICE_UUID, MEASUREMENT_SERVICE_UUID]),
             AdStructure::CompleteLocalName(name.as_bytes()),
         ],
         &mut advertiser_data[..],
