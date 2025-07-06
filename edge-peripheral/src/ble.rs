@@ -54,11 +54,13 @@ struct Server {
     time_service: TimeService
 }
 
-#[gatt_service(uuid = CURRENT_TIME_SERVICE_UUID)]
+/// Time service
+#[gatt_service(uuid = BluetoothUuid16::new(CURRENT_TIME_SERVICE_UUID))]
 struct TimeService {
-    #[characteristic(uuid = CURRENT_TIME_CHARACTERISTIC_UUID, write, read)]
+    #[characteristic(uuid = BluetoothUuid16::new(CURRENT_TIME_CHARACTERISTIC_UUID), write, read)]
     current_time: [u8; 10]
 }
+
 
 // #[gatt_service(uuid = MEASUREMENT_SERVICE_UUID)]
 // struct MeasurementService {
@@ -139,23 +141,22 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rt
             GattConnectionEvent::Disconnected { reason } => break reason,
             GattConnectionEvent::Gatt { event: Err(e) } => warn!("[gatt] error processing event: {:?}", e),
             GattConnectionEvent::Gatt { event: Ok(event) } => {
+                
                 match &event {
                     GattEvent::Read(event) => {
-     
-
+                        info!("[gatt] Read Gatt Event {} {}", event.handle(), current_time.handle);
                         if(event.handle() == current_time.handle) {
-                            // let ct = CurrentTime::from_naivedatetime(rtc.current_time());
-
+                            info!("[gatt] Read Event to current time Characteristic");
                             let now = rtc.current_time();
+                            info!("[gatt] Read Event to current time Characteristic: {:?}", Debug2Format(&now));
                             let ct = CurrentTime::from_naivedatetime(now);
+                            info!("[gatt] Read Event to current time Characteristic: {:?}", Debug2Format(&ct));
                             let value = ct.to_bytes();
                             current_time.set(&server, &value).expect("Unable to set the time");
-                            info!("[gatt] Read Event to curren time Characteristic: {:?}", Debug2Format(&now));
+                            info!("[gatt] Read Event to current time Characteristic: {:?}", Debug2Format(&now));
                         }
                     }
                     GattEvent::Write(event) => {
-
-
                         if event.handle() == current_time.handle {
                             let bytes = event.data();
                             let ct = CurrentTime::from_bytes(&bytes);
@@ -190,7 +191,7 @@ async fn advertise<'values, 'server, C: Controller>(
     let len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::ServiceUuids128(&[CURRENT_TIME_SERVICE_UUID, MEASUREMENT_SERVICE_UUID]),
+            AdStructure::ServiceUuids16(&[[0x05, 0x18]]),
             AdStructure::CompleteLocalName(name.as_bytes()),
         ],
         &mut advertiser_data[..],

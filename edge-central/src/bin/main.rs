@@ -5,11 +5,15 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use tokio::time::{sleep, Duration};
 use std::error::Error;
-use edge_protocol::{CurrentTime, Measurement};
+use edge_protocol::{CurrentTime, Measurement, CURRENT_TIME_CHARACTERISTIC_UUID, CURRENT_TIME_SERVICE_UUID};
 use anyhow::*;
 
-const CURRENT_TIME_SERVICE_UUID: Uuid = uuid_from_u16(0x1805);
-const CURRENT_TIME_CHAR_UUID: Uuid = uuid_from_u16(0x2a2b);
+// const CURRENT_TIME_SERVICE: Uuid = Uuid::from_bytes(CURRENT_TIME_SERVICE_UUID);
+// const CURRENT_TIME_CHAR: Uuid = Uuid::from_bytes(CURRENT_TIME_CHARACTERISTIC_UUID);
+
+const CURRENT_TIME_SERVICE: Uuid = uuid_from_u16(CURRENT_TIME_SERVICE_UUID);
+const CURRENT_TIME_CHAR: Uuid = uuid_from_u16(CURRENT_TIME_CHARACTERISTIC_UUID);
+
 
 struct PeripheralSyncResult {
     time_drift: Duration,
@@ -33,28 +37,41 @@ impl BlePeripheralSync {
 impl PeripheralSync for BlePeripheralSync {
 
     async fn sync(&self, now: DateTime<Utc>) -> Result<PeripheralSyncResult> {
+
+        println!("Connecting to device...");
+
         if !self.peripheral.is_connected().await? {
             self.peripheral.connect().await?;
+
+            println!("Connected to device");
         }
 
+        println!("Discovering services...");
         self.peripheral.discover_services().await?;
 
-        let has_current_time_service = self.peripheral.services().iter().any(|s| {
-            s.uuid == CURRENT_TIME_SERVICE_UUID
+        println!("Checking for Current Time Service...");
+        let services =  self.peripheral.services();
+        let current_time_svc = services.iter().find(|s| {
+            s.uuid == CURRENT_TIME_SERVICE
         });
 
-        if !has_current_time_service {
-            self.peripheral.disconnect().await?;
-            println!("Disconnected device");
-            return Err(anyhow!("Device does not have Current Time Service"));
-        }
-
+        let svc = match current_time_svc {
+            Some(s) => s,
+            None => {
+                self.peripheral.disconnect().await?;
+                println!("Disconnected device");
+                return Err(anyhow!("Device does not have Current Time Service"));
+            }
+        };
         println!("Found device with Current Time Service!");
 
-        let characteristics = self.peripheral.characteristics();
-        let characteristic = characteristics.iter().find(|c| {
-            c.uuid == CURRENT_TIME_CHAR_UUID
+
+
+        let characteristic = svc.characteristics.iter().find(|c| {
+            c.uuid == CURRENT_TIME_CHAR
         });
+
+        println!("Found characteristic: {:?}", characteristic);
 
         let charac = match characteristic {
             Some(c) => c,
@@ -65,16 +82,25 @@ impl PeripheralSync for BlePeripheralSync {
             }
         };
 
+        println!("Reading current time from device...");
         // Read current time from device
         let data = self.peripheral.read(charac).await?;
+        println!("Read data: {:?}", data);
         let bytes = data.as_slice();
         let current_time = CurrentTime::from_bytes(bytes);
         let datetime = current_time.to_naivedatetime();                    
+        println!("Current time: {:?}", datetime);
 
         let duration = now.naive_utc() - datetime;
+        println!("Time drift: {:?}", duration);
+
         let ct = CurrentTime::from_naivedatetime(now.naive_utc());
         let bytes = ct.to_bytes();
-        self.peripheral.write(charac, &bytes, WriteType::WithResponse).await?;
+        self.peripheral.write(charac, &bytes, WriteType::WithoutResponse).await?;
+        println!("Wrote current time to device");
+
+        self.peripheral.disconnect().await?;
+        println!("Disconnected device");
 
         Ok(PeripheralSyncResult {
             time_drift: Duration::from_nanos(duration.num_nanoseconds().unwrap_or(0) as u64),
@@ -94,14 +120,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         println!("Scanning for BLE devices with Current Time Service...");
-        adapter.start_scan(ScanFilter { services: vec![CURRENT_TIME_SERVICE_UUID] }).await?;
+        adapter.start_scan(ScanFilter { services: vec![CURRENT_TIME_SERVICE] }).await?;
         sleep(Duration::from_secs(4)).await;
 
         let peripherals = adapter.peripherals().await?;
         for peripheral in peripherals {
             let sync = BlePeripheralSync::new(peripheral);
-            let result = sync.sync(Utc::now()).await?;
-            println!("Time drift: {:?}", result.time_drift);
+            match sync.sync(Utc::now()).await.ok() {
+                Some(result) => {
+                    println!("Time drift: {:?}", result.time_drift);
+                }
+                None => {
+                    println!("Failed to sync with device");
+                }
+            }
         }
 
         println!("Waiting before rescanning...");
