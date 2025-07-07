@@ -4,6 +4,9 @@
 use bitflags::bitflags;
 use chrono::prelude::*;
 
+// BLE Address Service (custom service)
+pub const ADDRESS_SERVICE_UUID_16: u16 = 0xFFF5;
+pub const ADDRESS_CHARACTERISTIC_UUID_16: u16 = 0x18DD;
 
 // BLE Measurement Service (custom service)
 pub const MEASUREMENT_SERVICE_UUID_16: u16 = 0xFFF6;
@@ -12,6 +15,8 @@ pub const MEASUREMENT_CHARACTERISTIC_UUID_16: u16 =  0x18EE;
 // BLE Current Time Service (standard BLE service)
 pub const CURRENT_TIME_SERVICE_UUID: u16 = 0x1805;
 pub const CURRENT_TIME_CHARACTERISTIC_UUID: u16 = 0x2a2b;
+
+
 
 #[derive(Clone, Copy)]
 pub struct MeasurementSerieEntry {

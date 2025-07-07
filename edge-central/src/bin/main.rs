@@ -10,10 +10,13 @@ use anyhow::{Result, anyhow};
 
 const CURRENT_TIME_SERVICE: Uuid = uuid_from_u16(CURRENT_TIME_SERVICE_UUID);
 const CURRENT_TIME_CHAR: Uuid = uuid_from_u16(CURRENT_TIME_CHARACTERISTIC_UUID);
-const MEASUREMENT_SERVICE: Uuid = Uuid::from_u128(MEASUREMENT_SERVICE_UUID);
+const MEASUREMENT_SERVICE: Uuid = uuid_from_u16(MEASUREMENT_SERVICE_UUID_16);
 const MEASUREMENT_CHAR: Uuid = uuid_from_u16(MEASUREMENT_CHARACTERISTIC_UUID_16);
+const ADDRESS_SERVICE: Uuid = uuid_from_u16(ADDRESS_SERVICE_UUID_16);
+const ADDRESS_CHAR: Uuid = uuid_from_u16(ADDRESS_CHARACTERISTIC_UUID_16);
 
 struct PeripheralSyncResult {
+    address: [u8; 6],
     time_drift: Duration,
     measurements: Vec<MeasurementSerieEntry>,
 }
@@ -61,6 +64,10 @@ impl PeripheralSync for BlePeripheralSync {
             self.peripheral.connect().await?;
         }
 
+        let address_char = find_characteristic_or_disconnect(&self.peripheral, ADDRESS_SERVICE, ADDRESS_CHAR).await?;
+        let data = self.peripheral.read(&address_char).await?;
+        let address: [u8; 6] = data.as_slice().try_into().map_err(|_| anyhow!("Address data is not 6 bytes"))?;
+
         let current_time_char = find_characteristic_or_disconnect(&self.peripheral, CURRENT_TIME_SERVICE, CURRENT_TIME_CHAR).await?;
         let data = self.peripheral.read(&current_time_char).await?;
         let bytes = data.as_slice();
@@ -89,6 +96,7 @@ impl PeripheralSync for BlePeripheralSync {
         }
 
         Ok(PeripheralSyncResult {
+            address: address,
             time_drift: Duration::from_nanos(duration.num_nanoseconds().unwrap_or(0) as u64),
             measurements: measurements
         })
@@ -114,8 +122,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let sync = BlePeripheralSync::new(peripheral);
             match sync.sync(Utc::now()).await {
                 Ok(result) => {
+                    println!("Address: {:02X?}", result.address);
                     println!("Time drift: {:?}", result.time_drift);
-                    print_measurements(result.measurements);
+                    println!("Measurements: {:?}", result.measurements.len());
+                    println!("--------");
                 }
                 Err(err) => {
                     println!("Failed to sync with device: {:?}", err);
@@ -125,17 +135,5 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         println!("Waiting before rescanning...");
         sleep(Duration::from_secs(10)).await;
-    }
-}
-
-fn print_measurements(measurements: Vec<MeasurementSerieEntry>) {
-    for measurement in measurements {
-        println!("Measurement timestmap: {:?}", measurement.timestamp);
-        println!("--");
-        println!("Measurement temperature: {:?}", measurement.measurement.temperature);
-        println!("Measurement humidity: {:?}", measurement.measurement.humidity);
-        println!("Measurement battery: {:?}", measurement.measurement.battery);
-        println!("Measurement lux: {:?}", measurement.measurement.lux);
-        println!("--------");
     }
 }

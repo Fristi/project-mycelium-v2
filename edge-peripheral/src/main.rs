@@ -9,6 +9,7 @@ pub mod types;
 use core::cell::RefCell;
 
 use bt_hci::controller::ExternalController;
+use bt_hci::param::{AddrKind, BdAddr};
 use critical_section::Mutex;
 use edge_protocol::CurrentTime;
 use esp_hal::analog::adc::{Adc, AdcConfig};
@@ -30,6 +31,7 @@ use gauge::Gauge;
 use heapless::Vec;
 use timeseries::{Series, Deviate};
 use esp_println as _;
+use trouble_host::Address;
 
 use crate::types::DeviceState;
 
@@ -96,7 +98,9 @@ async fn main(_spawner: Spawner) {
     let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth);
     let controller: ExternalController<_, 20> = ExternalController::new(connector);
 
-    ble::run(controller, &mut rtc).await;
+    let mac = esp_hal::efuse::Efuse::mac_address();
+
+    ble::run(controller, &mut rtc, mac).await;
 
     
     

@@ -1,4 +1,5 @@
 use core::cell::UnsafeCell;
+use core::ops::Add;
 
 use embassy_futures::join::join;
 use embassy_futures::select::select;
@@ -71,8 +72,15 @@ impl FromGatt for MeasurementSeries {
 
 #[gatt_server]
 struct Server {
+    address_service: AddressService,
     time_service: TimeService,
     measurement_service: MeasurementService
+}
+
+#[gatt_service(uuid = ADDRESS_SERVICE_UUID_16)]
+struct AddressService {
+    #[characteristic(uuid = ADDRESS_CHARACTERISTIC_UUID_16, read)]
+    address: [u8; 6]
 }
 
 /// Time service
@@ -90,17 +98,13 @@ struct MeasurementService {
 }
 
 /// Run the BLE stack.
-pub async fn run<C>(controller: C, rtc: &mut Rtc<'_>)
+pub async fn run<C>(controller: C, rtc: &mut Rtc<'_>, address: [u8; 6])
 where
     C: Controller,
 {
-    // Using a fixed "random" address can be useful for testing. In real scenarios, one would
-    // use e.g. the MAC 6 byte array as the address (how to get that varies by the platform).
-    let address: Address = Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]);
-    info!("Our address = {:?}", address);
 
     let mut resources: HostResources<CONNECTIONS_MAX, L2CAP_CHANNELS_MAX, L2CAP_MTU> = HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
+    let stack = trouble_host::new(controller, &mut resources).set_random_address(Address::random(address));
     let Host {
         mut peripheral, runner, ..
     } = stack.build();
@@ -123,7 +127,7 @@ where
                 Ok(conn) => {
                     info!("Got gatt connection");
                     // set up tasks when the connection is established to a central, so they don't run when no one is connected.
-                    let a = gatt_events_task(&server, &conn, rtc);
+                    let a = gatt_events_task(&server, &conn, rtc, address);
                     let b = custom_task(&server, &conn, &stack);
                     // run until any task ends (usually because the connection has been closed),
                     // then return to advertising state.
@@ -155,7 +159,9 @@ async fn ble_task<C: Controller>(mut runner: Runner<'_, C>) {
 ///
 /// This function will handle the GATT events and process them.
 /// This is how we interact with read and write requests.
-async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rtc: &mut Rtc<'_>) -> Result<(), Error> {
+async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rtc: &mut Rtc<'_>, address: [u8; 6]) -> Result<(), Error> {
+
+    server.address_service.address.set(&server, &address).expect("Unable to set address");
 
     let reason = loop {
         match conn.next().await {
