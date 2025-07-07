@@ -6,13 +6,14 @@ use chrono::prelude::*;
 
 
 // BLE Measurement Service (custom service)
-pub const MEASUREMENT_SERVICE_UUID:u16 = 0x1234;
-pub const MEASUREMENT_CHARACTERISTIC_UUID:u16 = 0x4321;
+pub const MEASUREMENT_SERVICE_UUID_16: u16 = 0xFFF6;
+pub const MEASUREMENT_CHARACTERISTIC_UUID_16: u16 =  0x18EE;
 
 // BLE Current Time Service (standard BLE service)
 pub const CURRENT_TIME_SERVICE_UUID: u16 = 0x1805;
 pub const CURRENT_TIME_CHARACTERISTIC_UUID: u16 = 0x2a2b;
 
+#[derive(Clone, Copy)]
 pub struct MeasurementSerieEntry {
     pub timestamp: NaiveDateTime,
     pub measurement: Measurement
@@ -103,6 +104,7 @@ impl MeasurementSerieEntry {
 
 
 
+#[derive(Clone, Copy)]
 pub struct Measurement {
     pub battery: u8,
     pub lux: f32,
