@@ -3,7 +3,22 @@
 
 use bitflags::bitflags;
 use chrono::prelude::*;
+use timeseries::Deviate;
 
+// BLE Address Service (custom service)
+pub const ADDRESS_SERVICE_UUID_16: u16 = 0xFFF5;
+pub const ADDRESS_CHARACTERISTIC_UUID_16: u16 = 0xFFF7;
+
+// BLE Measurement Service (custom service)
+pub const MEASUREMENT_SERVICE_UUID_16: u16 = 0xFFF6;
+pub const MEASUREMENT_CHARACTERISTIC_UUID_16: u16 =  0xFFF8;
+
+// BLE Current Time Service (standard BLE service)
+pub const CURRENT_TIME_SERVICE_UUID: u16 = 0x1805;
+pub const CURRENT_TIME_CHARACTERISTIC_UUID: u16 = 0x2a2b;
+
+
+#[derive(Clone, Copy)]
 pub struct MeasurementSerieEntry {
     pub timestamp: NaiveDateTime,
     pub measurement: Measurement
@@ -94,11 +109,30 @@ impl MeasurementSerieEntry {
 
 
 
+#[derive(Clone, Copy)]
 pub struct Measurement {
     pub battery: u8,
     pub lux: f32,
     pub temperature: f32,
     pub humidity: f32
+}
+
+impl Deviate for Measurement {
+    fn deviate(&self, other: &Self, max_deviation: &Self) -> bool {
+        (self.temperature - other.temperature).abs() > max_deviation.temperature ||
+        (self.humidity - other.humidity).abs() > max_deviation.humidity ||
+        self.battery.abs_diff(other.battery) > max_deviation.battery ||
+        (self.lux - other.lux).abs() > max_deviation.lux
+    }
+}
+
+impl Measurement {
+    pub const MAX_DEVIATION: Self = Self {
+        battery: 1,
+        lux: 100.0,
+        temperature: 1.0,
+        humidity: 1.0
+    };
 }
 
 impl Measurement {
