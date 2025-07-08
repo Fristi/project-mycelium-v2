@@ -9,13 +9,13 @@ pub mod types;
 use core::cell::RefCell;
 
 use bt_hci::controller::ExternalController;
-use bt_hci::param::{AddrKind, BdAddr};
-use critical_section::Mutex;
-use edge_protocol::CurrentTime;
-use esp_hal::analog::adc::{Adc, AdcConfig};
-use esp_hal::gpio::{Output, OutputConfig};
+use chrono::NaiveDateTime;
+use edge_protocol::{Measurement, MeasurementSerieEntry};
+use esp_hal::analog::adc::{Adc, AdcChannel, AdcConfig};
+use esp_hal::gpio::{GpioPin, Output, OutputConfig};
 use defmt::{error, info, flush};
 use embassy_executor::Spawner;
+use esp_hal::i2c::master::BusTimeout;
 use esp_hal::ram;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
@@ -28,15 +28,90 @@ use esp_hal::{clock::CpuClock, time::Rate};
 use esp_wifi::ble::controller::BleConnector;
 use esp_wifi::{init, EspWifiController};
 use gauge::Gauge;
-use heapless::Vec;
-use timeseries::{Series, Deviate};
 use esp_println as _;
-use trouble_host::Address;
+use heapless::Vec;
+use timeseries::Series;
 
+use crate::battery::BatteryMeasurement;
 use crate::types::DeviceState;
 
-// #[ram(rtc_fast)]
-// static mut STATE: Mutex<RefCell<DeviceState>> = Mutex::new(RefCell::new(DeviceState::AwaitingTimeSync));
+
+// TODO: This is a hack to get the state of the device across the different states.
+// It is not thread safe and should be replaced with a more robust solution.
+// see: https://stackoverflow.com/questions/79177001/esp-no-std-rust-persist-data-during-deep-sleeps
+#[ram(rtc_fast)]
+static mut STATE: DeviceState = DeviceState::AwaitingTimeSync;
+
+#[esp_hal_embassy::main]
+async fn main(_spawner: Spawner) {
+    
+    let mut state = unsafe { &STATE };
+    let mut boot_args = DeviceBootArgs::boot(&state);
+
+    let mut cfg = RtcSleepConfig::deep();
+    cfg.set_rtc_fastmem_pd_en(false);
+    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10));
+    
+    match boot_args {
+        DeviceBootArgs::AwaitingTimeSync { mut rtc, mac, ble } => {
+            
+            info!("Awaiting time sync");
+
+            ble::run(ble, &mut rtc, mac.clone(), Vec::new()).await;
+
+            unsafe {
+                let series: Measurements = Series::new(Measurement::MAX_DEVIATION);
+                let new_state = DeviceState::Buffering(series);
+                STATE = new_state;
+            }
+
+            rtc.sleep(&cfg, &[&wakeup_source]);
+        }
+        DeviceBootArgs::Buffering { mut rtc, mut gauge, measurements } => {
+            info!("Buffering");
+
+            let measurement = gauge.sample().await;
+            let mut new_measurements = (*measurements).clone();
+            
+            new_measurements.append_monotonic(rtc.current_time(), measurement);
+
+            let new_state = if new_measurements.is_full() {
+                DeviceState::Flush(new_measurements)
+            } else {  
+                DeviceState::Buffering(new_measurements)
+            };
+
+            unsafe {
+                STATE = new_state;
+            }
+
+            rtc.sleep(&cfg, &[&wakeup_source]);
+        }
+        DeviceBootArgs::Flush { mut rtc, mac, mut gauge, measurements, ble } => {
+            info!("Flushing");
+
+            let entries: Vec<MeasurementSerieEntry, 6> = measurements
+                .buckets
+                .iter()
+                .map(|entry| MeasurementSerieEntry { timestamp: entry.range.start, measurement: entry.value })
+                .collect();
+            
+            ble::run(ble, &mut rtc, mac.clone(), entries).await;
+
+            let measurement = gauge.sample().await;
+
+            let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
+
+            new_measurements.append_monotonic(rtc.current_time(), measurement);
+
+            unsafe {
+                STATE = DeviceState::Buffering(new_measurements);
+            }
+
+            rtc.sleep(&cfg, &[&wakeup_source]);
+        }
+    };
+}
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
@@ -61,104 +136,114 @@ macro_rules! mk_static {
     }};
 }
 
-#[esp_hal_embassy::main]
-async fn main(_spawner: Spawner) {
-    // generator version: 0.3.1 
+type Measurements = Series<6, NaiveDateTime, Measurement>;
 
-    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-    let peripherals: Peripherals = esp_hal::init(config);
-
-    esp_alloc::heap_allocator!(size: 72 * 1024);
-
-    // let mut cfg = RtcSleepConfig::deep();
-    // cfg.set_rtc_fastmem_pd_en(false);
-    // let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10));
-    let mut rtc = Rtc::new(peripherals.LPWR);
-    // rtc.rwdt.enable();
-
-    let timer0 = TimerGroup::new(peripherals.TIMG1);
-    esp_hal_embassy::init(timer0.timer0);
-    info!("Embassy initialized!");
-    
-    /// BLE SECTION
-    
-    let timer1 = TimerGroup::new(peripherals.TIMG0);
-    let esp_wifi_ctrl = &*mk_static!(
-        EspWifiController<'static>,
-        init(
-            timer1.timer0,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap()
-    );
-    let bluetooth = peripherals.BT;
-    // _spawner.spawn(ble_embassy_task(esp_wifi_ctrl, bluetooth)).unwrap();
-
-    let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth);
-    let controller: ExternalController<_, 20> = ExternalController::new(connector);
-
-    let mac = esp_hal::efuse::Efuse::mac_address();
-
-    ble::run(controller, &mut rtc, mac).await;
-
-    
-    
-
-
-    // let adc_pin = peripherals.GPIO34;
-    // let mut adc_config = AdcConfig::new();
-    // let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
-    // let adc = Adc::new(peripherals.ADC1, adc_config);
-
-    
-
-
-    // unsafe {
-    //     println!("measurement: {}", MEASUREMENTS.len());
-    // }
-
-    // let output_config = OutputConfig::default();
-
-    // let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config);
-    // let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config);
-    // let mut pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config);
-    
-    // let mut i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
-    //     peripherals.I2C0,
-    //     esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
-    // )
-    // .expect("I2c init failed")
-    // .with_sda(i2c_pcb_sda)
-    // .with_scl(i2c_pcb_scl));
-
-    // let battery = BatteryMeasurement::new(adc, pin);
-    // let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
-
-    // let measurement = gauge.sample().await;
-
-    // unsafe {
-    //     let entries = MEASUREMENTS.len();
-
-    //     if(entries == 10) {
-    //         MEASUREMENTS.clear();
-    //     }
-
-    //     MEASUREMENTS.push(measurement);
-    // }
-
-    // rtc.sleep(&cfg, &[&wakeup_source]);
-
-    loop {}
+pub enum DeviceBootArgs<'a> {
+    AwaitingTimeSync { rtc: Rtc<'a>, mac: [u8; 6], ble: ExternalController<BleConnector<'a>, 20> },
+    Buffering { rtc: Rtc<'a>, gauge: Gauge<'a, GpioPin<34>>, measurements: &'a Measurements },
+    Flush { rtc: Rtc<'a>, mac: [u8; 6], gauge: Gauge<'a, GpioPin<34>>, measurements: &'a Measurements, ble: ExternalController<BleConnector<'a>, 20> }
 }
 
-// #[embassy_executor::task]
-// async fn ble_embassy_task(
-//     init: &'static EspWifiController<'static>,
-//     bt: BT
-// ) {
-//     let connector = BleConnector::new(&init, bt);
-//     let controller: ExternalController<_, 20> = ExternalController::new(connector);
+impl <'a> DeviceBootArgs<'a> {
+    pub fn boot(state: &'a DeviceState) -> Self {
 
-//     ble::run(controller).await;
-// }
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let peripherals: Peripherals = esp_hal::init(config);
+    
+        esp_alloc::heap_allocator!(size: 72 * 1024);
+
+        let mac = esp_hal::efuse::Efuse::mac_address();
+        let mut rtc = Rtc::new(peripherals.LPWR);
+    
+        let timer0 = TimerGroup::new(peripherals.TIMG1);
+        esp_hal_embassy::init(timer0.timer0);
+
+        info!("Embassy initialized!");
+
+        match state {
+            DeviceState::AwaitingTimeSync => {
+        
+                let timer1 = TimerGroup::new(peripherals.TIMG0);
+                let esp_wifi_ctrl = &*mk_static!(
+                    EspWifiController<'static>,
+                    init(
+                        timer1.timer0,
+                        Rng::new(peripherals.RNG),
+                        peripherals.RADIO_CLK,
+                    )
+                    .unwrap()
+                );
+                let bluetooth = peripherals.BT;
+                let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth);
+                let ble: ExternalController<_, 20> = ExternalController::new(connector);
+
+                Self::AwaitingTimeSync { rtc, mac, ble }
+            }
+            DeviceState::Buffering(measurements) => {
+                let adc_pin = peripherals.GPIO34;
+                let mut adc_config = AdcConfig::new();
+                let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
+                let adc = Adc::new(peripherals.ADC1, adc_config);
+                let output_config = OutputConfig::default();
+            
+                let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config);
+                let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config);
+                let mut pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config);
+                
+                let mut i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                    peripherals.I2C0,
+                    esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
+                )
+                .expect("I2c init failed")
+                .with_sda(i2c_pcb_sda)
+                .with_scl(i2c_pcb_scl));
+            
+                let battery = BatteryMeasurement::new(adc, pin);
+                let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
+
+
+                Self::Buffering { rtc: rtc, gauge, measurements }
+            },
+            DeviceState::Flush(measurements) => {
+        
+                let timer1 = TimerGroup::new(peripherals.TIMG0);
+                let esp_wifi_ctrl = &*mk_static!(
+                    EspWifiController<'static>,
+                    init(
+                        timer1.timer0,
+                        Rng::new(peripherals.RNG),
+                        peripherals.RADIO_CLK,
+                    )
+                    .unwrap()
+                );
+                let bluetooth = peripherals.BT;
+                let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth);
+
+                let controller: ExternalController<_, 20> = ExternalController::new(connector);
+
+                let adc_pin = peripherals.GPIO34;
+                let mut adc_config = AdcConfig::new();
+                let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
+                let adc = Adc::new(peripherals.ADC1, adc_config);
+                let output_config = OutputConfig::default();
+            
+                let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config);
+                let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config);
+                let mut pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config);
+                
+                let mut i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                    peripherals.I2C0,
+                    esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
+                )
+                .expect("I2c init failed")
+                .with_sda(i2c_pcb_sda)
+                .with_scl(i2c_pcb_scl));
+            
+                let battery = BatteryMeasurement::new(adc, pin);
+                let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
+
+                Self::Flush { rtc, mac, gauge, measurements, ble: controller }
+            }
+        }
+    }
+}

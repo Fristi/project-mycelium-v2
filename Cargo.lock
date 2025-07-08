@@ -523,6 +523,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.9.1",
  "chrono",
+ "timeseries",
 ]
 
 [[package]]
@@ -2134,7 +2135,7 @@ dependencies = [
 [[package]]
 name = "timeseries"
 version = "0.1.0"
-source = "git+https://github.com/Fristi/timeseries?rev=ca2808e7fef75f641ef82f50168ca0a1bc5e5c08#ca2808e7fef75f641ef82f50168ca0a1bc5e5c08"
+source = "git+https://github.com/Fristi/timeseries?rev=869521bb62a99a101e8f0f7d60fadac2a2a046ba#869521bb62a99a101e8f0f7d60fadac2a2a046ba"
 dependencies = [
  "heapless 0.7.17",
 ]
