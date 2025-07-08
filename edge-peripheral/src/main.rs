@@ -59,11 +59,15 @@ async fn main(_spawner: Spawner) {
 
             ble::run(ble, &mut rtc, mac.clone(), Vec::new()).await;
 
+            info!("Awaiting time sync: done");
+
             unsafe {
                 let series: Measurements = Series::new(Measurement::MAX_DEVIATION);
                 let new_state = DeviceState::Buffering(series);
                 STATE = new_state;
             }
+            
+            info!("Sleeping");
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
@@ -84,6 +88,8 @@ async fn main(_spawner: Spawner) {
             unsafe {
                 STATE = new_state;
             }
+
+            info!("Sleeping");
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
@@ -107,6 +113,8 @@ async fn main(_spawner: Spawner) {
             unsafe {
                 STATE = DeviceState::Buffering(new_measurements);
             }
+
+            info!("Sleeping");
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
@@ -202,7 +210,7 @@ impl <'a> DeviceBootArgs<'a> {
                 let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
 
 
-                Self::Buffering { rtc: rtc, gauge, measurements }
+                Self::Buffering { rtc, gauge, measurements }
             },
             DeviceState::Flush(measurements) => {
         

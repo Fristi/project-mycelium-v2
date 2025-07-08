@@ -1,6 +1,7 @@
 use core::cell::UnsafeCell;
-use embassy_futures::join::join;
 use defmt::{info, warn, error, Debug2Format};
+use embassy_futures::select::select;
+use embassy_time::{Delay, Duration, Timer};
 use esp_hal::rtc_cntl::Rtc;
 use trouble_host::prelude::*;
 use trouble_host::types::gatt_traits::FromGattError;
@@ -117,26 +118,26 @@ where
 
     info!("Starting adv and event loop");
 
-    let _ = join(ble_task(runner), async {
+
+    
+    let _ = select(ble_task(runner), async {
         
         info!("Advertising...");
 
-        loop {
-            match advertise("Mycelium", &mut peripheral, &server).await {
-                Ok(conn) => {
-                    info!("Got gatt connection");
-                    match gatt_events_task(&server, &conn, rtc, address, measurements.clone()).await {
-                        Ok(_) => (),
-                        Err(e) => {
-                            let e = defmt::Debug2Format(&e);
-                            error!("[adv] error: {:?}", e);
-                        }
+        match advertise("Mycelium", &mut peripheral, &server).await {
+            Ok(conn) => {
+                info!("Got gatt connection");
+                match gatt_events_task(&server, &conn, rtc, address, measurements.clone()).await {
+                    Ok(_) => (),
+                    Err(e) => {
+                        let e = defmt::Debug2Format(&e);
+                        error!("[adv] error: {:?}", e);
                     }
                 }
-                Err(e) => {
-                    let e = defmt::Debug2Format(&e);
-                    panic!("[adv] error: {:?}", e);
-                }
+            }
+            Err(e) => {
+                let e = defmt::Debug2Format(&e);
+                panic!("[adv] error: {:?}", e);
             }
         }
 
@@ -167,26 +168,38 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rt
 
     let reason = loop {
         match conn.next().await {
-            GattConnectionEvent::Disconnected { reason } => break reason,
             GattConnectionEvent::Gatt { event: Err(e) } => warn!("[gatt] error processing event: {:?}", e),
-            GattConnectionEvent::Gatt { event: Ok(event) } => {
+            GattConnectionEvent::Gatt { event: Ok(event_) } => {
                 
-                match &event {
+                match &event_ {
                     GattEvent::Read(event) => {
-
                         if event.handle() == server.measurement_service.measurement.handle {
                             info!("[gatt] Read Event to measurement Characteristic");
-                            
-                        }
-                        
-                        if event.handle() == server.time_service.current_time.handle {
+                            match event_.accept() {
+                                Ok(reply) => {
+                                    reply.send().await;
+                                    Timer::after_millis(300).await;
+                                    break
+                                },
+                                Err(e) => warn!("[gatt] error sending response: {:?}", e),
+                            };
+                        } else if event.handle() == server.time_service.current_time.handle {
                             info!("[gatt] Read Event to current time Characteristic");
                             let now = rtc.current_time();
                             let ct = CurrentTime::from_naivedatetime(now);
                             let value = ct.to_bytes();
                             server.time_service.current_time.set(&server, &value).expect("Unable to set the time");
+                            match event_.accept() {
+                                Ok(reply) => reply.send().await,
+                                Err(e) => warn!("[gatt] error sending response: {:?}", e),
+                            }
+                        } else {
+                            match event_.accept() {
+                                Ok(reply) => reply.send().await,
+                                Err(e) => warn!("[gatt] error sending response: {:?}", e),
+                            }
                         }
-                        
+
                         
                     }
                     GattEvent::Write(event) => {
@@ -196,14 +209,12 @@ async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rt
                              info!("[gatt] Write Event to current time Characteristic: {:?}", Debug2Format(&ct));
 
                             rtc.set_current_time(ct.to_naivedatetime());
+                            match event_.accept() {
+                                Ok(reply) => reply.send().await,
+                                Err(e) => warn!("[gatt] error sending response: {:?}", e),
+                            };
                         }
                     }
-                };
-                // This step is also performed at drop(), but writing it explicitly is necessary
-                // in order to ensure reply is sent.
-                match event.accept() {
-                    Ok(reply) => reply.send().await,
-                    Err(e) => warn!("[gatt] error sending response: {:?}", e),
                 };
             }
             _ => {} // ignore other Gatt Connection Events
