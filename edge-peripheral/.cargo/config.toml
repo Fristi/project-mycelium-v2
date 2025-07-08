@@ -2,8 +2,6 @@
 runner = "espflash flash --monitor --chip esp32 --port /dev/tty.usbserial-54350025201 --log-format defmt"
 # runner = "espflash flash --monitor --chip esp32 --port /dev/tty.usbserial-11103 --log-format defmt"
 
-[target.riscv32imc-unknown-none-elf]
-runner = "probe-rs run --chip esp32c3 --no-location --preverify --restore-unwritten --always-print-stacktrace --catch-hardfault"
 
 [env]
 DEFMT_LOG="info"
@@ -13,7 +11,7 @@ rustflags = [
   "-C", "link-arg=-nostartfiles",
 ]
 
-target = "riscv32imc-unknown-none-elf"
+target = "xtensa-esp32-none-elf"
 
 [unstable]
 build-std = ["alloc", "core"]
