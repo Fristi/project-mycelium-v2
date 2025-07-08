@@ -71,10 +71,10 @@ async fn main(_spawner: Spawner) {
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
-        DeviceBootArgs::Buffering { mut rtc, mut gauge, measurements } => {
+        DeviceBootArgs::Buffering { mut rtc, mut gauge, measurements, mut rng } => {
             info!("Buffering");
 
-            let measurement = gauge.sample().await;
+            let measurement = random_measurement(&mut rng); // gauge.sample().await;
             let mut new_measurements = (*measurements).clone();
             
             new_measurements.append_monotonic(rtc.current_time(), measurement);
@@ -93,7 +93,7 @@ async fn main(_spawner: Spawner) {
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
-        DeviceBootArgs::Flush { mut rtc, mac, mut gauge, measurements, ble } => {
+        DeviceBootArgs::Flush { mut rtc, mac, mut gauge, measurements, ble, mut rng } => {
             info!("Flushing");
 
             let entries: Vec<MeasurementSerieEntry, 6> = measurements
@@ -104,7 +104,7 @@ async fn main(_spawner: Spawner) {
             
             ble::run(ble, &mut rtc, mac.clone(), entries).await;
 
-            let measurement = gauge.sample().await;
+            let measurement = random_measurement(&mut rng); // gauge.sample().await;
 
             let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
 
@@ -119,6 +119,15 @@ async fn main(_spawner: Spawner) {
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
     };
+}
+
+fn random_measurement(rng: &mut Rng) -> Measurement {
+    Measurement {
+        battery: (rng.random() % 101) as u8,
+        lux: (rng.random() % 100001) as f32,
+        temperature: (rng.random() % 46) as f32,
+        humidity: (rng.random() % 101) as f32
+    }
 }
 
 #[panic_handler]
@@ -148,8 +157,8 @@ type Measurements = Series<6, NaiveDateTime, Measurement>;
 
 pub enum DeviceBootArgs<'a> {
     AwaitingTimeSync { rtc: Rtc<'a>, mac: [u8; 6], ble: ExternalController<BleConnector<'a>, 20> },
-    Buffering { rtc: Rtc<'a>, gauge: Gauge<'a, GpioPin<34>>, measurements: &'a Measurements },
-    Flush { rtc: Rtc<'a>, mac: [u8; 6], gauge: Gauge<'a, GpioPin<34>>, measurements: &'a Measurements, ble: ExternalController<BleConnector<'a>, 20> }
+    Buffering { rtc: Rtc<'a>, gauge: Gauge<'a, GpioPin<34>>, measurements: &'a Measurements, rng: Rng },
+    Flush { rtc: Rtc<'a>, mac: [u8; 6], gauge: Gauge<'a, GpioPin<34>>, measurements: &'a Measurements, ble: ExternalController<BleConnector<'a>, 20>, rng: Rng }
 }
 
 impl <'a> DeviceBootArgs<'a> {
@@ -162,6 +171,7 @@ impl <'a> DeviceBootArgs<'a> {
 
         let mac = esp_hal::efuse::Efuse::mac_address();
         let mut rtc = Rtc::new(peripherals.LPWR);
+        let rng = Rng::new(peripherals.RNG);
     
         let timer0 = TimerGroup::new(peripherals.TIMG1);
         esp_hal_embassy::init(timer0.timer0);
@@ -176,7 +186,7 @@ impl <'a> DeviceBootArgs<'a> {
                     EspWifiController<'static>,
                     init(
                         timer1.timer0,
-                        Rng::new(peripherals.RNG),
+                        rng,
                         peripherals.RADIO_CLK,
                     )
                     .unwrap()
@@ -210,7 +220,7 @@ impl <'a> DeviceBootArgs<'a> {
                 let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
 
 
-                Self::Buffering { rtc, gauge, measurements }
+                Self::Buffering { rtc, gauge, measurements, rng }
             },
             DeviceState::Flush(measurements) => {
         
@@ -219,7 +229,7 @@ impl <'a> DeviceBootArgs<'a> {
                     EspWifiController<'static>,
                     init(
                         timer1.timer0,
-                        Rng::new(peripherals.RNG),
+                        rng,
                         peripherals.RADIO_CLK,
                     )
                     .unwrap()
@@ -250,7 +260,7 @@ impl <'a> DeviceBootArgs<'a> {
                 let battery = BatteryMeasurement::new(adc, pin);
                 let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
 
-                Self::Flush { rtc, mac, gauge, measurements, ble: controller }
+                Self::Flush { rtc, mac, gauge, measurements, ble: controller, rng }
             }
         }
     }
