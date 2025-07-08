@@ -16,7 +16,7 @@ use esp_hal::gpio::{GpioPin, Output, OutputConfig};
 use defmt::{error, info, flush};
 use embassy_executor::Spawner;
 use esp_hal::i2c::master::BusTimeout;
-use esp_hal::ram;
+use esp_hal::{peripherals, ram};
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::{
@@ -165,8 +165,9 @@ impl <'a> DeviceBootArgs<'a> {
     pub fn boot(state: &'a DeviceState) -> Self {
 
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-        let peripherals: Peripherals = esp_hal::init(config);
-    
+        let mut peripherals: Peripherals = esp_hal::init(config);
+
+
         esp_alloc::heap_allocator!(size: 72 * 1024);
 
         let mac = esp_hal::efuse::Efuse::mac_address();
@@ -198,6 +199,7 @@ impl <'a> DeviceBootArgs<'a> {
                 Self::AwaitingTimeSync { rtc, mac, ble }
             }
             DeviceState::Buffering(measurements) => {
+
                 let adc_pin = peripherals.GPIO34;
                 let mut adc_config = AdcConfig::new();
                 let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
@@ -217,7 +219,7 @@ impl <'a> DeviceBootArgs<'a> {
                 .with_scl(i2c_pcb_scl));
             
                 let battery = BatteryMeasurement::new(adc, pin);
-                let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
+                let gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
 
 
                 Self::Buffering { rtc, gauge, measurements, rng }

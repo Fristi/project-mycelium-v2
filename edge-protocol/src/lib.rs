@@ -7,11 +7,11 @@ use timeseries::Deviate;
 
 // BLE Address Service (custom service)
 pub const ADDRESS_SERVICE_UUID_16: u16 = 0xFFF5;
-pub const ADDRESS_CHARACTERISTIC_UUID_16: u16 = 0x18DD;
+pub const ADDRESS_CHARACTERISTIC_UUID_16: u16 = 0xFFF7;
 
 // BLE Measurement Service (custom service)
 pub const MEASUREMENT_SERVICE_UUID_16: u16 = 0xFFF6;
-pub const MEASUREMENT_CHARACTERISTIC_UUID_16: u16 =  0x18EE;
+pub const MEASUREMENT_CHARACTERISTIC_UUID_16: u16 =  0xFFF8;
 
 // BLE Current Time Service (standard BLE service)
 pub const CURRENT_TIME_SERVICE_UUID: u16 = 0x1805;

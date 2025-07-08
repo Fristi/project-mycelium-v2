@@ -14,4 +14,3 @@ target = "xtensa-esp32-none-elf"
 
 [unstable]
 build-std = ["alloc", "core"]
-  

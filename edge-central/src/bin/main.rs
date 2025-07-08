@@ -81,6 +81,11 @@ impl PeripheralSync for BlePeripheralSync {
 
         let measurement_char = find_characteristic_or_disconnect(&self.peripheral, MEASUREMENT_SERVICE, MEASUREMENT_CHAR).await?;
         let measurement_data = self.peripheral.read(&measurement_char).await?;
+
+        if measurement_data.len() != 198 {
+            self.peripheral.disconnect().await?;
+            return Err(anyhow!("Measurement data is not 198 bytes"));
+        }
        
         let mut measurements = Vec::<MeasurementSerieEntry>::new();
         
@@ -89,15 +94,15 @@ impl PeripheralSync for BlePeripheralSync {
             let end = start + 33;
             let segment = &measurement_data[start..end];
             
-            match MeasurementSerieEntry::from_tlv(segment).ok() {
-                Some(entry) => measurements.push(entry),
-                _ => continue
+            match MeasurementSerieEntry::from_tlv(segment) {
+                Ok(entry) => measurements.push(entry),
+                Err(err) => println!("Error decoding measurement entry {:?}", err)
             }
         }
 
         Ok(PeripheralSyncResult {
             address: address,
-            time_drift: Duration::from_nanos(duration.num_nanoseconds().unwrap_or(0) as u64),
+            time_drift: Duration::from_nanos(duration.num_nanoseconds().unwrap_or(i64::MAX).unsigned_abs()),
             measurements: measurements
         })
     }

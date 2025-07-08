@@ -60,7 +60,7 @@ impl FromGatt for MeasurementSeries {
             let end = start + 33;
             let segment = &data[start..end];
 
-            let entry = MeasurementSerieEntry::from_tlv(segment).expect("Unable to decode measurement entry");  
+            let entry = MeasurementSerieEntry::from_tlv(segment).map_err(|_| FromGattError::InvalidLength)?;
             if measurements.push(entry).is_err() {
                 break;
             }
@@ -163,8 +163,8 @@ async fn ble_task<C: Controller>(mut runner: Runner<'_, C>) {
 async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rtc: &mut Rtc<'_>, address: [u8; 6], measurements: MeasurementSerieEntryVec) -> Result<(), Error> {
 
     let series = MeasurementSeries(measurements.clone());
-    server.measurement_service.measurement.set(&server, &series).expect("Unable to set measurement data");
-    server.address_service.address.set(&server, &address).expect("Unable to set address");
+    server.measurement_service.measurement.set(&server, &series).map_err(|_e| Error::Other);
+    server.address_service.address.set(&server, &address).map_err(|_e| Error::Other);
 
     let reason = loop {
         match conn.next().await {
