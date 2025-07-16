@@ -12,7 +12,8 @@ use crate::{data::{sqlite::SqliteMeasurementRepository, types::MeasurementReposi
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let opts = SqliteConnectOptions::from_str("sqlite://mycelium.db")?
+    let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://mycelium.db".to_string());
+    let opts = SqliteConnectOptions::from_str(&database_url)?
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
         .read_only(false);
@@ -20,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
     // use in a pool
     let pool = SqlitePool::connect_with(opts).await?;
 
-    sqlx::migrate!().run(&pool).await;
+    sqlx::migrate!().run(&pool).await?;
 
     let mac = [0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa];
     let repo = Arc::new(SqliteMeasurementRepository::new(pool));
@@ -29,19 +30,20 @@ async fn main() -> anyhow::Result<()> {
         delay: Duration::milliseconds(2000)
     };
 
-    let stream = provider.stream().flat_map(stream::iter);
+    let stream = provider
+        .stream()
+        .flat_map(stream::iter)
+        .take(3);
 
 
-    stream.take(3).for_each(|item| async {
-        match repo.insert(&mac, item.measurements).await {
-            Err(err) => eprintln!("Error occurred while inserting: {:?}", err),
-            _ => ()
-        };
-        ()
+    stream.for_each(|item| async {
+        if let Err(err) = repo.insert(&mac, item.measurements).await {
+            eprintln!("Error occurred while inserting: {:?}", err);
+        }
     }).await;
 
 
-    let results = repo.find_by_mac(&mac).await;
+    let results = repo.find_by_mac(&mac).await?;
 
     println!("Found results: {}", results.len());
 

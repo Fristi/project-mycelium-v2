@@ -38,7 +38,7 @@ impl MeasurementSerieEntryRow {
         edge_protocol::MeasurementSerieEntry {
             timestamp: self.timestamp,
             measurement: edge_protocol::Measurement {
-                battery: self.battery as u8,
+                battery: self.battery.try_into().unwrap_or(100),
                 lux: self.lux as f32,
                 temperature: self.temperature as f32,
                 humidity: self.humidity as f32,
@@ -61,15 +61,13 @@ impl SqliteMeasurementRepository {
 }
 
 impl MeasurementRepository for SqliteMeasurementRepository {
-    async fn insert(&self, mac: &[u8; 6], entries: Vec<edge_protocol::MeasurementSerieEntry>) -> anyhow::Result<u32> {
+    async fn insert(&self, mac: &[u8; 6], entries: Vec<edge_protocol::MeasurementSerieEntry>) -> anyhow::Result<u64> {
 
-        let mut inserted = 0u32;
+        let mut inserted = 0u64;
+        let mut tx = self.pool.begin().await?;
 
         for entry in &entries {
             let row = MeasurementSerieEntryRow::from_measurement_serie_entry(mac, entry, 0);
-
-            let mut conn = self.pool.acquire().await?;
-
             let res = sqlx::query!(
                 r#"
                 INSERT INTO measurements (mac, timestamp, battery, lux, temperature, humidity)
@@ -82,18 +80,20 @@ impl MeasurementRepository for SqliteMeasurementRepository {
                 row.temperature,
                 row.humidity
             )
-            .execute(&mut *conn)
+            .execute(&mut *tx)
             .await?;
         
-            inserted += 1;
+            inserted += res.rows_affected();
         }
+
+        tx.commit().await?;
 
         Ok(inserted)
     }
 
-    async fn find_by_mac(&self, mac: &[u8; 6]) -> Vec<MeasurementSerieEntry> {
+    async fn find_by_mac(&self, mac: &[u8; 6]) -> anyhow::Result<Vec<MeasurementSerieEntry>> {
         let mac_ref = mac.as_ref();
-        let rows = match sqlx::query_as!(
+        let rows = sqlx::query_as!(
             MeasurementSerieEntryRow,
             r#"
             SELECT id, mac, timestamp, battery, lux, temperature, humidity
@@ -103,16 +103,9 @@ impl MeasurementRepository for SqliteMeasurementRepository {
             mac_ref
         )
         .fetch_all(&self.pool)
-        .await
-        {
-            Ok(rows) => rows.iter().map(|x| x.to_measurement_serie_entry()).collect(),
-            Err(err) => {
-                eprintln!("Error occurred: {:?}", err);
-                return vec![]
-            }
-        };
+        .await?;
 
-        rows
+        Ok(rows.iter().map(|x| x.to_measurement_serie_entry()).collect())
     }
 }
 
@@ -156,7 +149,7 @@ mod tests {
         assert_eq!(inserted, 1);
 
         // Find by mac
-        let found = repo.find_by_mac(&mac).await;
+        let found = repo.find_by_mac(&mac).await.expect("Unable to find by mac");
         assert_eq!(found.len(), 1);
 
         let found_entry = &found[0];
@@ -182,7 +175,7 @@ mod tests {
 
         let mac = [0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
 
-        let found = repo.find_by_mac(&mac).await;
+        let found = repo.find_by_mac(&mac).await.expect("Unable to find by mac");
         assert!(found.is_empty());
     }
 }
