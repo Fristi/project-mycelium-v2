@@ -1,7 +1,5 @@
 use chrono::NaiveDateTime;
 use edge_protocol::MeasurementSerieEntry;
-use sqlx::any;
-
 
 pub trait MeasurementRepository {
     async fn insert(&self, mac: &[u8; 6], entries: Vec<MeasurementSerieEntry>) -> anyhow::Result<u64>;
@@ -17,6 +15,6 @@ pub struct EdgeState {
 }
 
 pub trait EdgeStateRepository {
-    async fn get(&self, ) -> anyhow::Result<Option<EdgeState>>;
+    async fn get(&self) -> anyhow::Result<Option<EdgeState>>;
     async fn set(&self, state: &EdgeState) -> anyhow::Result<u64>;
 }

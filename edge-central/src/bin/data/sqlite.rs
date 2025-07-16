@@ -60,6 +60,7 @@ pub struct EdgeStateRow {
 impl EdgeStateRow {
     pub fn from_edge_state(state: &crate::data::types::EdgeState) -> Self {
         EdgeStateRow {
+            // We only store one edge state, so the identifier is hard-coded to 1
             id: 1,
             wifi_ssid: state.wifi_ssid.clone(),
             wifi_password: state.wifi_password.clone(),
@@ -339,7 +340,7 @@ mod tests {
         };
 
         let state2 = EdgeState {
-            wifi_ssid: "ssid1".to_string(), // same ssid, so should update
+            wifi_ssid: "ssid1".to_string(),
             wifi_password: "pass2".to_string(),
             auth0_access_token: "token2".to_string(),
             auth0_refresh_token: "refresh2".to_string(),
