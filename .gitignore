@@ -18,10 +18,12 @@ pnpm-debug.log*
 **/*.elf
 **/*.hex
 **/*.bin
+**/.sqlx
 
 # Logs, dumps, debug tools
 *.dump
 *.out
+*.db*
 
 # Flash artifacts
 *.uf2
