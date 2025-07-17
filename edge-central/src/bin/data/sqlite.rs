@@ -4,7 +4,6 @@ use sqlx::SqlitePool;
 
 use crate::data::types::{EdgeState, EdgeStateRepository, MeasurementRepository};
 
-
 #[derive(Debug, sqlx::FromRow)]
 pub struct MeasurementSerieEntryRow {
     pub id: i64,
@@ -13,7 +12,7 @@ pub struct MeasurementSerieEntryRow {
     pub battery: i64,
     pub lux: f64,
     pub temperature: f64,
-    pub humidity: f64
+    pub humidity: f64,
 }
 
 impl MeasurementSerieEntryRow {
@@ -45,7 +44,6 @@ impl MeasurementSerieEntryRow {
         }
     }
 }
-
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct EdgeStateRow {
@@ -81,9 +79,8 @@ impl EdgeStateRow {
     }
 }
 
-
 pub struct SqliteEdgeStateRepository {
-    pool: SqlitePool
+    pool: SqlitePool,
 }
 
 impl SqliteEdgeStateRepository {
@@ -136,9 +133,8 @@ impl EdgeStateRepository for SqliteEdgeStateRepository {
     }
 }
 
-
 pub struct SqliteMeasurementRepository {
-    pool: SqlitePool
+    pool: SqlitePool,
 }
 
 impl SqliteMeasurementRepository {
@@ -148,8 +144,11 @@ impl SqliteMeasurementRepository {
 }
 
 impl MeasurementRepository for SqliteMeasurementRepository {
-    async fn insert(&self, mac: &[u8; 6], entries: Vec<edge_protocol::MeasurementSerieEntry>) -> anyhow::Result<u64> {
-
+    async fn insert(
+        &self,
+        mac: &[u8; 6],
+        entries: Vec<edge_protocol::MeasurementSerieEntry>,
+    ) -> anyhow::Result<u64> {
         let mut inserted = 0u64;
         let mut tx = self.pool.begin().await?;
 
@@ -169,7 +168,7 @@ impl MeasurementRepository for SqliteMeasurementRepository {
             )
             .execute(&mut *tx)
             .await?;
-        
+
             inserted += res.rows_affected();
         }
 
@@ -192,16 +191,19 @@ impl MeasurementRepository for SqliteMeasurementRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|x| x.to_measurement_serie_entry()).collect())
+        Ok(rows
+            .iter()
+            .map(|x| x.to_measurement_serie_entry())
+            .collect())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{TimeZone, Utc};
+    use edge_protocol::{Measurement, MeasurementSerieEntry};
     use sqlx::{sqlite::SqlitePoolOptions, Executor};
-    use edge_protocol::{MeasurementSerieEntry, Measurement};
-    use chrono::{Utc, TimeZone};
 
     #[tokio::test]
     async fn test_insert_and_find_by_mac() {
@@ -213,7 +215,10 @@ mod tests {
             .expect("Failed to create pool");
 
         // Run migrations instead of creating the table directly
-        sqlx::migrate!().run(&pool).await.expect("Failed to run migrations");
+        sqlx::migrate!()
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
 
         let repo = super::SqliteMeasurementRepository::new(pool.clone());
 
@@ -232,7 +237,10 @@ mod tests {
         let entries = vec![entry.clone()];
 
         // Insert entries
-        let inserted = repo.insert(&mac, entries.clone()).await.expect("Insert failed");
+        let inserted = repo
+            .insert(&mac, entries.clone())
+            .await
+            .expect("Insert failed");
         assert_eq!(inserted, 1);
 
         // Find by mac
@@ -240,10 +248,16 @@ mod tests {
         assert_eq!(found.len(), 1);
 
         let found_entry = &found[0];
-        assert_eq!(found_entry.timestamp.timestamp(), entry.timestamp.timestamp());
+        assert_eq!(
+            found_entry.timestamp.timestamp(),
+            entry.timestamp.timestamp()
+        );
         assert_eq!(found_entry.measurement.battery, entry.measurement.battery);
         assert_eq!(found_entry.measurement.lux, entry.measurement.lux);
-        assert_eq!(found_entry.measurement.temperature, entry.measurement.temperature);
+        assert_eq!(
+            found_entry.measurement.temperature,
+            entry.measurement.temperature
+        );
         assert_eq!(found_entry.measurement.humidity, entry.measurement.humidity);
     }
 
@@ -256,7 +270,10 @@ mod tests {
             .expect("Failed to create pool");
 
         // Run migrations instead of creating the table directly
-        sqlx::migrate!().run(&pool).await.expect("Failed to run migrations");
+        sqlx::migrate!()
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
 
         let repo = super::SqliteMeasurementRepository::new(pool.clone());
 
@@ -275,7 +292,10 @@ mod tests {
             .expect("Failed to create pool");
 
         // Run migrations to create the edge_state table
-        sqlx::migrate!().run(&pool).await.expect("Failed to run migrations");
+        sqlx::migrate!()
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
 
         let repo = SqliteEdgeStateRepository::new(pool.clone());
 
@@ -292,7 +312,10 @@ mod tests {
             .await
             .expect("Failed to create pool");
 
-        sqlx::migrate!().run(&pool).await.expect("Failed to run migrations");
+        sqlx::migrate!()
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
 
         let repo = SqliteEdgeStateRepository::new(pool.clone());
 
@@ -327,7 +350,10 @@ mod tests {
             .await
             .expect("Failed to create pool");
 
-        sqlx::migrate!().run(&pool).await.expect("Failed to run migrations");
+        sqlx::migrate!()
+            .run(&pool)
+            .await
+            .expect("Failed to run migrations");
 
         let repo = SqliteEdgeStateRepository::new(pool.clone());
 
