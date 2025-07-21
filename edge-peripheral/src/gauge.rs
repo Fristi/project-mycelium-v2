@@ -37,12 +37,12 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
         sht.start_measurement(shtcx::blocking::PowerMode::NormalMode).expect("SHTC3 unable to start measurement");
         bh1730fvc.set_mode(bh1730fvc::Mode::SingleShot, &mut i2c_pcb_bh1730fvc).expect("Unable to set mode");
 
-        Timer::after_millis(110).await;
+        Timer::after_millis(300).await;
 
         let lux = bh1730fvc.read_ambient_light_intensity(&mut i2c_pcb_sht).expect("Unable to read ambient light");
         let battery = self.bm.sample();
         
-        Timer::after_millis(110).await;
+        Timer::after_millis(300).await;
         let measurement = sht.get_measurement_result().expect("Unable to read temperature");
 
         self.pcb_pwr.set_low();

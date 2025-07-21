@@ -1,5 +1,5 @@
 use crate::data::types::EdgeState;
 
 pub trait Onboarding {
-    async fn process() -> anyhow::Result<EdgeState>;
+    async fn process(&self) -> anyhow::Result<EdgeState>;
 }

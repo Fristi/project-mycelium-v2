@@ -1,14 +1,17 @@
 pub mod auth;
+pub mod cfg;
 pub mod data;
 pub mod measurements;
 pub mod onboarding;
 
+use config::Config;
+use dotenv::dotenv;
 use futures::{stream, StreamExt};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc};
 
 use crate::{
-    data::{sqlite::SqliteMeasurementRepository, types::MeasurementRepository},
+    data::sqlite::{MeasurementSerieEntryRow, SqliteMeasurementRepository},
     measurements::{
         btleplug::BtleplugPeripheralSyncResultStreamProvider,
         types::PeripheralSyncResultStreamProvider,
@@ -17,9 +20,10 @@ use crate::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let database_url =
-        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://mycelium.db".to_string());
-    let opts = SqliteConnectOptions::from_str(&database_url)?
+    dotenv()?;
+
+    let app_config = cfg::AppConfig::from_env()?;
+    let opts = SqliteConnectOptions::from_str(&app_config.database_url)?
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
         .read_only(false);
@@ -29,36 +33,31 @@ async fn main() -> anyhow::Result<()> {
 
     sqlx::migrate!().run(&pool).await?;
 
-    let mac = [0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa];
-    let repo = Arc::new(SqliteMeasurementRepository::new(pool));
-    // let provider = measurements::random::RandomPeripheralSyncResultStreamProvider {
-    //     mac,
-    //     delay: Duration::milliseconds(2000)
+    // let edge_state_repo = SqliteEdgeStateRepository::new(pool);
+
+    // match edge_state_repo.get().await? {
+    //     Some(state) => (),
+    //     None => todo!()
     // };
 
-    let btleplug = BtleplugPeripheralSyncResultStreamProvider::new().await?;
-    let provider = Arc::new(btleplug);
+    let repo = Arc::new(SqliteMeasurementRepository::new(pool));
 
-    let stream = provider.stream().flat_map(stream::iter).take(3);
+    let provider = BtleplugPeripheralSyncResultStreamProvider::new().await?;
+    let stream = provider.stream().flat_map(stream::iter).take(1);
 
     stream
-        .for_each(|item| async {
-            if let Err(err) = repo.insert(&mac, item.measurements).await {
-                eprintln!("Error occurred while inserting: {:?}", err);
+        .for_each(|m| async {
+            for measurement in m.measurements {
+                let row = MeasurementSerieEntryRow::from_measurement_serie_entry(
+                    &[0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa],
+                    &measurement,
+                    0,
+                );
+
+                println!("row: {:?}", row)
             }
         })
         .await;
-
-    let results = repo.find_by_mac(&mac).await?;
-
-    println!("Found results: {}", results.len());
-
-    for result in results {
-        println!(
-            "Entry: {:?} - {:?} lux",
-            result.timestamp, result.measurement.lux
-        );
-    }
 
     Ok(())
 }

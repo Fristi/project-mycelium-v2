@@ -91,13 +91,12 @@ impl SqliteEdgeStateRepository {
 
 impl EdgeStateRepository for SqliteEdgeStateRepository {
     async fn get(&self) -> anyhow::Result<Option<EdgeState>> {
-        let row = sqlx::query_as!(
-            EdgeStateRow,
-            r#"
+        let row: Option<EdgeStateRow> = sqlx::query_as(
+            "
             SELECT id, wifi_ssid, wifi_password, auth0_access_token, auth0_refresh_token, auth0_expires_at
             FROM edge_state
             LIMIT 1
-            "#
+            "
         )
         .fetch_optional(&self.pool)
         .await?;
@@ -108,8 +107,8 @@ impl EdgeStateRepository for SqliteEdgeStateRepository {
     async fn set(&self, state: &EdgeState) -> anyhow::Result<u64> {
         let row = EdgeStateRow::from_edge_state(&state);
 
-        let res = sqlx::query!(
-            r#"
+        let res = sqlx::query(
+            "
             INSERT INTO edge_state (id, wifi_ssid, wifi_password, auth0_access_token, auth0_refresh_token, auth0_expires_at)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ON CONFLICT(id) DO UPDATE SET
@@ -118,14 +117,14 @@ impl EdgeStateRepository for SqliteEdgeStateRepository {
                 auth0_access_token = excluded.auth0_access_token,
                 auth0_refresh_token = excluded.auth0_refresh_token,
                 auth0_expires_at = excluded.auth0_expires_at
-            "#,
-            row.id,
-            row.wifi_ssid,
-            row.wifi_password,
-            row.auth0_access_token,
-            row.auth0_refresh_token,
-            row.auth0_expires_at
+            "
         )
+        .bind(row.id)
+        .bind(row.wifi_ssid)
+        .bind(row.wifi_password)
+        .bind(row.auth0_access_token)
+        .bind(row.auth0_refresh_token)
+        .bind(row.auth0_expires_at)
         .execute(&self.pool)
         .await?;
 
@@ -153,19 +152,19 @@ impl MeasurementRepository for SqliteMeasurementRepository {
         let mut tx = self.pool.begin().await?;
 
         for entry in &entries {
-            let row = MeasurementSerieEntryRow::from_measurement_serie_entry(mac, entry, 0);
-            let res = sqlx::query!(
-                r#"
+            let row = MeasurementSerieEntryRow::from_measurement_serie_entry(&mac, entry, 0);
+            let res = sqlx::query(
+                "
                 INSERT INTO measurements (mac, timestamp, battery, lux, temperature, humidity)
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-                "#,
-                row.mac,
-                row.timestamp,
-                row.battery,
-                row.lux,
-                row.temperature,
-                row.humidity
+                ",
             )
+            .bind(row.mac)
+            .bind(row.timestamp)
+            .bind(row.battery)
+            .bind(row.lux)
+            .bind(row.temperature)
+            .bind(row.humidity)
             .execute(&mut *tx)
             .await?;
 
@@ -179,15 +178,14 @@ impl MeasurementRepository for SqliteMeasurementRepository {
 
     async fn find_by_mac(&self, mac: &[u8; 6]) -> anyhow::Result<Vec<MeasurementSerieEntry>> {
         let mac_ref = mac.as_ref();
-        let rows = sqlx::query_as!(
-            MeasurementSerieEntryRow,
-            r#"
+        let rows: Vec<MeasurementSerieEntryRow> = sqlx::query_as(
+            "
             SELECT id, mac, timestamp, battery, lux, temperature, humidity
             FROM measurements
             WHERE mac = ?
-            "#,
-            mac_ref
+            ",
         )
+        .bind(mac_ref)
         .fetch_all(&self.pool)
         .await?;
 

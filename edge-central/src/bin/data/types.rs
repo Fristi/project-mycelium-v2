@@ -10,6 +10,7 @@ pub trait MeasurementRepository {
     async fn find_by_mac(&self, mac: &[u8; 6]) -> anyhow::Result<Vec<MeasurementSerieEntry>>;
 }
 
+#[derive(Debug)]
 pub struct EdgeState {
     pub wifi_ssid: String,
     pub wifi_password: String,
