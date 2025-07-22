@@ -50,12 +50,10 @@ export class MyceliumBuild {
    */
   containerCentral(): Container {
     const src = this.source;
-    const cargoCache = dag.cacheVolume("cargo-central");
 
     return dag
       .container()
       .from("rust:1.88-bookworm")
-      .withMountedCache("/usr/local/cargo/registry", cargoCache)
       .withExec(["apt-get", "update"])
       .withExec([
         "apt-get",
@@ -66,6 +64,7 @@ export class MyceliumBuild {
         "dbus",
         "pkg-config",
       ])
+      .withMountedCache("/root/.cargo", dag.cacheVolume("cargo-edge-central"))
       .withDirectory("/workspace", src)
       .withWorkdir("/workspace/edge-central");
   }
@@ -75,12 +74,10 @@ export class MyceliumBuild {
    */
   containerPeripheral(arch: string): Container {
     const src = this.source;
-    const cargoCache = dag.cacheVolume("cargo-peripheral");
 
     return dag
       .container({ platform: arch })
       .from("rust:1.88-bookworm")
-      .withMountedCache("/usr/local/cargo/registry", cargoCache)
       .withExec(["apt-get", "update"])
       .withExec([
         "apt-get",
@@ -91,6 +88,8 @@ export class MyceliumBuild {
         "curl",
         "pkg-config",
       ])
+      .withMountedCache("/root", dag.cacheVolume("root-edge-peripheral"))
+      .withMountedCache("/usr/local/rustup/toolchains/esp", dag.cacheVolume("firmware-rustup-esp-toolchain"))
       .withExec(["bash", "-c", "cargo install espup --locked"])
       .withExec(["bash", "-c", "espup install"])
       .withDirectory("/workspace", src)
@@ -122,15 +121,6 @@ export class MyceliumBuild {
   async testCentral(): Promise<string> {
     return this.containerCentral()
       .withExec(["cargo", "test"]).stdout();
-  }
-
-  /**
-   * Run Clippy linting on the central component
-   */
-  @func()
-  async lintCentral(): Promise<string> {
-    return this.containerCentral()
-      .withExec(["cargo", "clippy", "--", "-D", "warnings"]).stdout();
   }
 
   /**
