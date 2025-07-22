@@ -10,7 +10,7 @@ pub enum OnboardingStrategy {
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
-pub enum PeripherhalSyncMode {
+pub enum PeripheralSyncMode {
     Ble,
     Random,
 }
@@ -34,7 +34,7 @@ pub struct WifiConfig {
 pub struct AppConfig {
     pub database_url: String,
     pub onboarding_strategy: OnboardingStrategy,
-    pub peripherhal_sync_mode: PeripherhalSyncMode,
+    pub peripheral_sync_mode: PeripheralSyncMode,
     pub auth0: Auth0Config,
     pub wifi: WifiConfig,
 }
@@ -86,8 +86,8 @@ mod tests {
             OnboardingStrategy::Ble => {}
             _ => panic!("Expected OnboardingStrategy::Ble"),
         }
-        match config.peripherhal_sync_mode {
-            PeripherhalSyncMode::Random => {}
+        match config.peripheral_sync_mode {
+            PeripheralSyncMode::Random => {}
             _ => panic!("Expected PeripherhalSyncMode::Random"),
         }
         assert_eq!(config.auth0.domain, "test.auth0.com");
@@ -135,8 +135,8 @@ mod tests {
             OnboardingStrategy::Local => {}
             _ => panic!("Expected OnboardingStrategy::Local"),
         }
-        match config.peripherhal_sync_mode {
-            PeripherhalSyncMode::Ble => {}
+        match config.peripheral_sync_mode {
+            PeripheralSyncMode::Ble => {}
             _ => panic!("Expected PeripherhalSyncMode::Ble"),
         }
         assert_eq!(config.auth0.domain, "other.auth0.com");

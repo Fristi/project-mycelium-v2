@@ -9,12 +9,19 @@ use chrono::TimeDelta;
 use dotenv::dotenv;
 use futures::{stream, StreamExt};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
-use std::{iter, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use crate::{
-    cfg::{AppConfig, OnboardingStrategy, PeripherhalSyncMode}, data::sqlite::{MeasurementSerieEntryRow, SqliteEdgeStateRepository, SqliteMeasurementRepository}, measurements::{
-        btleplug::BtleplugPeripheralSyncResultStreamProvider, random::RandomPeripheralSyncResultStreamProvider, types::PeripheralSyncResultStreamProvider
-    }, onboarding::{local::LocalOnboarding, types::Onboarding}
+    cfg::{AppConfig, OnboardingStrategy, PeripheralSyncMode},
+    data::sqlite::{
+        MeasurementSerieEntryRow, SqliteEdgeStateRepository,
+    },
+    measurements::{
+        btleplug::BtleplugPeripheralSyncResultStreamProvider,
+        random::RandomPeripheralSyncResultStreamProvider,
+        types::PeripheralSyncResultStreamProvider,
+    },
+    onboarding::{local::LocalOnboarding, types::Onboarding},
 };
 
 #[tokio::main]
@@ -33,10 +40,8 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!().run(&*pool).await?;
 
     let edge_state_repo = SqliteEdgeStateRepository::new(pool.clone());
-    let edge_state = match edge_state_repo.get_state().await? {
-        Some(state) => {
-            state
-        },
+    let _edge_state = match edge_state_repo.get_state().await? {
+        Some(state) => state,
         None => {
             let onboarding = make_onboarding(&app_config).await?;
             let edge_state = onboarding.process().await?;
@@ -45,7 +50,7 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let provider = make_peripheral_sync_stream_provider(&app_config.peripherhal_sync_mode).await?;
+    let provider = make_peripheral_sync_stream_provider(&app_config.peripheral_sync_mode).await?;
     let stream = provider.stream().flat_map(stream::iter);
 
     stream
@@ -65,16 +70,18 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn make_peripheral_sync_stream_provider(mode: &PeripherhalSyncMode) -> anyhow::Result<Box<dyn PeripheralSyncResultStreamProvider>> {
+async fn make_peripheral_sync_stream_provider(
+    mode: &PeripheralSyncMode,
+) -> anyhow::Result<Box<dyn PeripheralSyncResultStreamProvider>> {
     match mode {
-        PeripherhalSyncMode::Ble => {
+        PeripheralSyncMode::Ble => {
             let provider = BtleplugPeripheralSyncResultStreamProvider::new().await?;
             Ok(Box::new(provider))
-        },
-        PeripherhalSyncMode::Random => {
+        }
+        PeripheralSyncMode::Random => {
             let provider = RandomPeripheralSyncResultStreamProvider::new(
-                [0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa], 
-                TimeDelta::seconds(2)
+                [0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa],
+                TimeDelta::seconds(2),
             );
 
             Ok(Box::new(provider))

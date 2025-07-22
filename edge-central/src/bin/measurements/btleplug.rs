@@ -45,7 +45,6 @@ impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamPr
     fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>> {
         let adapter = self.adapter.clone();
         let stream = futures::stream::unfold(adapter, |adapter| async {
-
             adapter
                 .start_scan(ScanFilter {
                     services: vec![CURRENT_TIME_SERVICE],

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::cfg::Auth0Config;
@@ -47,21 +49,13 @@ async fn post_form<T, const N: usize>(url: &str, form: [(&str, &str); N]) -> any
 where
     T: DeserializeOwned,
 {
-    let payload = form
-        .iter()
-        .map(|(k, v)| format!("{}={}", k, v))
-        .collect::<Vec<_>>()
-        .join("&")
-        .into_bytes();
+    let payload: HashMap<&str, &str> = form.iter().cloned().collect();
 
     let resp = reqwest::Client::new()
         .post(url)
-        .header("content-type", "application/x-www-form-urlencoded")
-        .header("content-length", payload.len().to_string())
-        .body(payload)
+        .form(&payload)
         .send()
-        .await
-        .expect("Error occurred");
+        .await?;
 
     let res = resp.json::<T>().await?;
 

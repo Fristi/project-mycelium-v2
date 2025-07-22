@@ -4,12 +4,15 @@ use tokio::time::{sleep, Duration};
 use wifi_rs::prelude::Connectivity;
 
 use crate::{
-    auth::auth0::{TokenResult, TokenStatus}, cfg::{Auth0Config, WifiConfig}, data::types::EdgeState, onboarding::types::Onboarding
+    auth::auth0::{TokenResult, TokenStatus},
+    cfg::{Auth0Config, WifiConfig},
+    data::types::EdgeState,
+    onboarding::types::Onboarding,
 };
 
 pub struct LocalOnboarding {
     auth0: Auth0Config,
-    wifi: WifiConfig
+    wifi: WifiConfig,
 }
 
 impl LocalOnboarding {
@@ -41,13 +44,15 @@ impl Onboarding for LocalOnboarding {
         );
 
         loop {
-            match crate::auth::auth0::poll_token(&self.auth0, device_code.device_code.as_str()).await {
+            match crate::auth::auth0::poll_token(&self.auth0, device_code.device_code.as_str())
+                .await
+            {
                 Ok(TokenResult::Full {
                     access_token,
                     refresh_token,
                     expires_in,
                 }) => {
-                    let expires_at = Utc::now() + Duration::from_millis(expires_in);
+                    let expires_at = Utc::now() + Duration::from_secs(expires_in);
                     return Ok(EdgeState {
                         wifi_ssid: self.wifi.ssid.clone(),
                         wifi_password: self.wifi.password.clone(),

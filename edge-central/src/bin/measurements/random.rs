@@ -19,9 +19,7 @@ impl RandomPeripheralSyncResultStreamProvider {
     }
 }
 
-
 impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProvider {
-
     fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>> {
         let delay = Duration::from_millis(self.delay.num_milliseconds() as u64);
         let mac = self.mac;

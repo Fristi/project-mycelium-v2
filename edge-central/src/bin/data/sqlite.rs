@@ -4,7 +4,7 @@ use chrono::NaiveDateTime;
 use edge_protocol::MeasurementSerieEntry;
 use sqlx::SqlitePool;
 
-use crate::data::types::{EdgeState};
+use crate::data::types::EdgeState;
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct MeasurementSerieEntryRow {
