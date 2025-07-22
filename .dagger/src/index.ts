@@ -112,18 +112,18 @@ export class MyceliumBuild {
    * Test the central component
    */
   @func()
-  testCentral(): Container {
+  async testCentral(): Promise<string> {
     return this.containerCentral()
-      .withExec(["cargo", "test"]);
+      .withExec(["cargo", "test"]).stdout();
   }
 
   /**
    * Build the peripheral component for ESP32
    */
   @func()
-  buildPeripheral(): Container {
+  async buildPeripheral(): Promise<string> {
     return this.containerPeripheral()
-      .withExec(["bash", "-c", "cargo build --release"]);
+      .withExec(["bash", "-c", "cargo build --release"]).stdout();
   }
 
   @func()
