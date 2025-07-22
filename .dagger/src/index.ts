@@ -76,7 +76,7 @@ export class MyceliumBuild {
     const src = this.source;
 
     return dag
-      .container({ platform: arch })
+      .container({ platform: arch as any })
       .from("rust:1.88-bookworm")
       .withExec(["apt-get", "update"])
       .withExec([
