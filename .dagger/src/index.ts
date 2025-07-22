@@ -73,12 +73,12 @@ export class MyceliumBuild {
   /**
    * Container for building the peripheral component with xtensa toolchain
    */
-  containerPeripheral(): Container {
+  containerPeripheral(arch: string): Container {
     const src = this.source;
     const cargoCache = dag.cacheVolume("cargo-peripheral");
 
     return dag
-      .container({ platform: "linux/arm64" })
+      .container({ platform: arch })
       .from("rust:1.88-bookworm")
       .withMountedCache("/usr/local/cargo/registry", cargoCache)
       .withExec(["apt-get", "update"])
@@ -93,11 +93,18 @@ export class MyceliumBuild {
       ])
       .withExec(["bash", "-c", "cargo install espup --locked"])
       .withExec(["bash", "-c", "espup install"])
-      .withExec(["bash", "-c", "source /root/export-esp.sh"])
       .withDirectory("/workspace", src)
       .withWorkdir("/workspace/edge-peripheral")
-    
   }
+
+  /**
+   * Execute a command in the peripheral container with ESP environment
+   */
+  execPeripheralWithEnv(arch: string, command: string): Container {
+    return this.containerPeripheral(arch)
+      .withExec(["bash", "-c", `source ~/export-esp.sh && ${command}`]);
+  }
+  
 
   /**
    * Build the central component
@@ -121,15 +128,14 @@ export class MyceliumBuild {
    * Build the peripheral component for ESP32
    */
   @func()
-  async buildPeripheral(): Promise<string> {
-    return this.containerPeripheral()
-      .withExec(["bash", "-c", "cargo build --release"]).stdout();
+  async buildPeripheral(@argument() arch: string = "linux/arm64"): Promise<string> {
+    return this.execPeripheralWithEnv(arch, "cargo build --release").stdout();
   }
 
   @func()
-  async ci() {
+  async ci(@argument() arch: string = "linux/amd64") {
     await Promise.all([
-      this.buildPeripheral(),
+      this.buildPeripheral(arch),
       this.testCentral()
     ]);
 
