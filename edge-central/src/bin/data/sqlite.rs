@@ -204,15 +204,17 @@ mod tests {
     #[tokio::test]
     async fn test_insert_and_find_by_mac() {
         // Create in-memory SQLite database
-        let pool = SqlitePoolOptions::new()
+        let pool = Arc::new(
+            SqlitePoolOptions::new()
             .max_connections(1)
             .connect("sqlite::memory:?cache=shared")
             .await
-            .expect("Failed to create pool");
+                .expect("Failed to create pool")
+        );
 
         // Run migrations instead of creating the table directly
         sqlx::migrate!()
-            .run(&pool)
+            .run(&*pool)
             .await
             .expect("Failed to run migrations");
 
@@ -231,7 +233,6 @@ mod tests {
         };
 
         let entries = vec![entry.clone()];
-
         // Insert entries
         let inserted = repo
             .insert(&mac, entries.clone())
@@ -259,18 +260,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_find_by_mac_empty() {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:?cache=shared")
+        let pool = Arc::new(
+            SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect("sqlite::memory:?cache=shared")
             .await
-            .expect("Failed to create pool");
+                .expect("Failed to create pool")
+        );
 
         // Run migrations instead of creating the table directly
         sqlx::migrate!()
-            .run(&pool)
+            .run(&*pool)
             .await
             .expect("Failed to run migrations");
-
         let repo = super::SqliteMeasurementRepository::new(pool.clone());
 
         let mac = [0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f];
@@ -281,35 +283,39 @@ mod tests {
 
     #[tokio::test]
     async fn test_edge_state_get_none() {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:?cache=shared")
-            .await
-            .expect("Failed to create pool");
+        let pool = Arc::new(
+            SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect("sqlite::memory:?cache=shared")
+                .await
+                .expect("Failed to create pool")
+        );
 
         // Run migrations to create the edge_state table
         sqlx::migrate!()
-            .run(&pool)
+            .run(&*pool)
             .await
             .expect("Failed to run migrations");
 
         let repo = SqliteEdgeStateRepository::new(pool.clone());
 
         // There should be no record yet
-        let result = repo.get().await.expect("Unable to get");
+        let result = repo.get_state().await.expect("Unable to get");
         assert!(result.is_none());
     }
 
     #[tokio::test]
     async fn test_edge_state_set_and_get_some() {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:?cache=shared")
-            .await
-            .expect("Failed to create pool");
+        let pool = Arc::new(
+            SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect("sqlite::memory:?cache=shared")
+                .await
+                .expect("Failed to create pool")
+        );
 
         sqlx::migrate!()
-            .run(&pool)
+            .run(&*pool)
             .await
             .expect("Failed to run migrations");
 
@@ -322,13 +328,12 @@ mod tests {
             auth0_refresh_token: "refresh1".to_string(),
             auth0_expires_at: NaiveDateTime::from_timestamp_opt(1_700_000_000, 0).unwrap(),
         };
-
         // Set the state
-        let affected = repo.set(&state).await.expect("Unable to set state");
+        let affected = repo.set_state(&state).await.expect("Unable to set state");
         assert_eq!(affected, 1);
 
         // Get the state
-        let result = repo.get().await.expect("Unable to get state");
+        let result = repo.get_state().await.expect("Unable to get state");
         assert!(result.is_some());
         let loaded = result.unwrap();
         assert_eq!(loaded.wifi_ssid, state.wifi_ssid);
@@ -340,14 +345,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_edge_state_set_overwrites() {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:?cache=shared")
-            .await
-            .expect("Failed to create pool");
+        let pool = Arc::new(
+            SqlitePoolOptions::new()
+                .max_connections(1)
+                .connect("sqlite::memory:?cache=shared")
+                .await
+                .expect("Failed to create pool")
+        );
 
         sqlx::migrate!()
-            .run(&pool)
+            .run(&*pool)
             .await
             .expect("Failed to run migrations");
 
@@ -370,15 +377,15 @@ mod tests {
         };
 
         // Set the first state
-        let affected1 = repo.set(&state1).await.expect("Unable to set state");
+        let affected1 = repo.set_state(&state1).await.expect("Unable to set state");
         assert_eq!(affected1, 1);
 
         // Set the second state (should update)
-        let affected2 = repo.set(&state2).await.expect("Unable to set state");
+        let affected2 = repo.set_state(&state2).await.expect("Unable to set state");
         // Depending on SQLite, this may be 1 or 0 if nothing changed, but at least it should not error
 
         // Get the state and check it's the updated one
-        let result = repo.get().await.expect("Unable to get state");
+        let result = repo.get_state().await.expect("Unable to get state");
         assert!(result.is_some());
         let loaded = result.unwrap();
         assert_eq!(loaded.wifi_ssid, state2.wifi_ssid);
@@ -386,5 +393,5 @@ mod tests {
         assert_eq!(loaded.auth0_access_token, state2.auth0_access_token);
         assert_eq!(loaded.auth0_refresh_token, state2.auth0_refresh_token);
         assert_eq!(loaded.auth0_expires_at, state2.auth0_expires_at);
-    }
+}
 }
