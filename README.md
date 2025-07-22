@@ -18,95 +18,34 @@ system consists of three main components:
   format between peripheral and central devices using TLV (Type-Length-Value)
   encoding
 
-## Features
-
-### Environmental Monitoring
-
-- **Temperature & Humidity**: SHTC3 sensor integration
-- **Light Measurement**: BH1730FVC ambient light sensor
-- **Battery Monitoring**: ADC-based battery level tracking
-- **Time Series Data**: Efficient data compression using deviation-based
-  filtering
-
-### Connectivity & Power Management
-
-- **BLE Communication**: Custom GATT services for data exchange
-- **Deep Sleep**: Optimized power consumption with configurable wake intervals
-- **Time Synchronization**: BLE Current Time Service implementation
-- **Data Buffering**: Local measurement storage with batch transmission
-
-### Data Management
-
-- **SQLite Database**: Local data persistence with WAL mode
-- **Measurement Storage**: Timestamped sensor readings with MAC address tracking
-- **Edge State Management**: WiFi credentials and Auth0 token storage
-- **Database Migrations**: Automated schema updates
-
-### Configuration & Deployment
-
-- **Environment-based Config**: Support for BLE and local onboarding strategies
-- **Auth0 Integration**: OAuth2 authentication for cloud services
-- **WiFi Management**: Configurable network connectivity
-- **Multiple Sync Modes**: BLE scanning or random data generation for testing
-- **Onboarding Strategies**: Support for local and BLE onboarding methods
-
-## Database Schema
-
-### Measurements Table
-
-```sql
-CREATE TABLE measurements (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mac BLOB NOT NULL,           -- 6-byte device MAC address
-    timestamp DATETIME NOT NULL,  -- Measurement timestamp
-    battery INTEGER NOT NULL,     -- Battery level (0-100)
-    lux REAL NOT NULL,           -- Light intensity in lux
-    temperature REAL NOT NULL,    -- Temperature in Celsius
-    humidity REAL NOT NULL        -- Relative humidity (0-100%)
-);
-```
-
-### Edge State Table
-
-```sql
-CREATE TABLE edge_state (
-    id INTEGER PRIMARY KEY,
-    wifi_ssid TEXT NOT NULL,
-    wifi_password TEXT NOT NULL,
-    auth0_access_token TEXT NOT NULL,
-    auth0_refresh_token TEXT NOT NULL,
-    auth0_expires_at DATETIME NOT NULL
-);
-```
-
 ## Getting Started
 
 ### Prerequisites
 
-- Rust toolchain with embedded targets
-- ESP32 development environment
-- SQLite for central device storage
+- Rust toolchain with embedded targets (1.88+)
+- ESP32 development environment with espup
 - Auth0 account for authentication
-- dotenv for environment configuration
+- Dagger CLI (optional, for local CI testing)
 
 ### Configuration
 
 Copy `edge-central/.env.sample` to `edge-central/.env` and configure:
 
 ```bash
-# New configuration format uses APP prefix
+# Configuration uses APP prefix with hierarchical structure
 APP.DATABASE_URL=sqlite://mycelium.db
 APP.PERIPHERAL_SYNC_MODE=ble  # or 'random' for testing
 APP.ONBOARDING_STRATEGY=local  # or 'ble'
 APP.AUTH0.DOMAIN=your-domain.auth0.com
 APP.AUTH0.CLIENT_ID=your-client-id
 APP.AUTH0.CLIENT_SECRET=your-client-secret
+APP.AUTH0.SCOPE=offline_access
+APP.AUTH0.AUDIENCE=your-audience
 APP.WIFI.SSID=your-wifi-ssid
 APP.WIFI.PASSWORD=your-wifi-password
 ```
 
-Note: The environment variable format has been updated with an `APP` prefix and
-hierarchical structure.
+The configuration system uses the `config` crate with environment variable support. All settings use the `APP` prefix with dot notation for hierarchical configuration.
 
 ### Auth0 Configuration
 
@@ -124,32 +63,82 @@ The application uses the dotenv crate to load environment variables from the
 
 ### Database Configuration
 
-The application uses SQLite with Write-Ahead Logging (WAL) mode for improved
+The central application uses SQLite with Write-Ahead Logging (WAL) mode for improved
 performance and concurrency. The database file is created automatically if it
 doesn't exist, and migrations are applied at startup.
 
-To initialize or update the database schema:
+## Build System & CI
+
+The project uses [Dagger](https://dagger.io/) for containerized builds and CI/CD. The build configuration is defined in TypeScript at `.dagger/src/index.ts`.
+
+### Local Development
 
 ```bash
-# The application will run migrations automatically at startup
-# No manual migration commands needed
+# Build central component
+cargo build --release -p edge-central
+
+# Build peripheral component (requires ESP toolchain)
+cd edge-peripheral
+# source some paths needed for xtensa toolchain
+. ~/export-esp.sh
+cargo build --release
+
+# Run tests
+cargo test -p edge-central
 ```
 
-The database schema includes tables for measurements and edge state as described
-in the Database Schema section.
+### Dagger CI
+
+The CI pipeline builds both components in isolated containers:
+
+```bash
+# Run full CI pipeline locally, you can include --arch=linux/arm64 or --arch=linux/amd64 depending on your platform
+dagger call ci
+
+# Build individual components
+dagger call build-central
+dagger call build-peripheral
+
+# Run tests
+dagger call test-central
+```
+
+### GitHub Actions
+
+The project uses GitHub Actions with Dagger for CI. The workflow:
+1. Builds the central component with dbus support
+2. Builds the peripheral component with ESP32 toolchain
+3. Runs all tests
 
 ## Development Notes
 
+### Configuration System
+
+The project uses a hierarchical configuration system with the following features:
+
+- **Environment Variables**: All configuration uses `APP.` prefix with dot notation
+- **Type Safety**: Configuration is deserialized into strongly-typed structs
+- **Validation**: Missing required values cause startup failures
+- **Flexibility**: Supports multiple onboarding strategies and sync modes
+
+Configuration enums:
+- `OnboardingStrategy`: `ble` or `local` (for testing)
+- `PeripheralSyncMode`: `ble` or `random` (for testing)
+
 ### Known Issues
 
-- There are some unused imports in the main.rs file that should be cleaned up:
-  - `config::Config` is imported but not used
-  - The `repo` variable is declared but not used
+- The project requires specific Rust version (1.88+) for ESP32 compatibility
+- ESP toolchain setup requires manual environment sourcing
+- Some git dependencies may require specific revisions for compatibility
 
-### Security Considerations
+### Testing
 
-- The Auth0 client secret should be properly secured and not committed to
-  version control
-- WiFi credentials in the .env file should be protected
-- Consider using environment variables for sensitive information in production
-  deployments
+The project includes comprehensive tests for the data layer:
+
+```bash
+# Run all tests
+cargo test
+
+# Run tests for specific component
+cargo test -p edge-central
+```
