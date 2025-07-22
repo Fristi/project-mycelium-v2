@@ -68,7 +68,7 @@ mod tests {
         // Set environment variables for testing
         env::set_var("APP.DATABASE_URL", "postgres://localhost/test");
         env::set_var("APP.ONBOARDING_STRATEGY", "ble");
-        env::set_var("APP.PERIPHERHAL_SYNC_MODE", "random");
+        env::set_var("APP.PERIPHERAL_SYNC_MODE", "random");
         env::set_var("APP.AUTH0.DOMAIN", "test.auth0.com");
         env::set_var("APP.AUTH0.CLIENT_ID", "test-client-id");
         env::set_var("APP.AUTH0.CLIENT_SECRET", "test-client-secret");
@@ -101,7 +101,7 @@ mod tests {
         // Clean up environment variables
         env::remove_var("APP.DATABASE_URL");
         env::remove_var("APP.ONBOARDING_STRATEGY");
-        env::remove_var("APP.PERIPHERHAL_SYNC_MODE");
+        env::remove_var("APP.PERIPHERAL_SYNC_MODE");
         env::remove_var("APP.AUTH0.DOMAIN");
         env::remove_var("APP.AUTH0.CLIENT_ID");
         env::remove_var("APP.AUTH0.CLIENT_SECRET");
@@ -117,7 +117,7 @@ mod tests {
         // Set environment variables for testing
         env::set_var("APP.DATABASE_URL", "mysql://localhost/test");
         env::set_var("APP.ONBOARDING_STRATEGY", "local");
-        env::set_var("APP.PERIPHERHAL_SYNC_MODE", "ble");
+        env::set_var("APP.PERIPHERAL_SYNC_MODE", "ble");
         env::set_var("APP.AUTH0.DOMAIN", "other.auth0.com");
         env::set_var("APP.AUTH0.CLIENT_ID", "other-client-id");
         env::set_var("APP.AUTH0.CLIENT_SECRET", "other-client-secret");
@@ -150,7 +150,7 @@ mod tests {
         // Clean up environment variables
         env::remove_var("APP.DATABASE_URL");
         env::remove_var("APP.ONBOARDING_STRATEGY");
-        env::remove_var("APP.PERIPHERHAL_SYNC_MODE");
+        env::remove_var("APP.PERIPHERAL_SYNC_MODE");
         env::remove_var("APP.AUTH0.DOMAIN");
         env::remove_var("APP.AUTH0.CLIENT_ID");
         env::remove_var("APP.AUTH0.CLIENT_SECRET");
@@ -164,7 +164,7 @@ mod tests {
         // Clear relevant environment variables
         env::remove_var("APP.DATABASE_URL");
         env::remove_var("APP.ONBOARDING_STRATEGY");
-        env::remove_var("APP.PERIPHERHAL_SYNC_MODE");
+        env::remove_var("APP.PERIPHERAL_SYNC_MODE");
         env::remove_var("APP.AUTH0.DOMAIN");
         env::remove_var("APP.AUTH0.CLIENT_ID");
         env::remove_var("APP.AUTH0.CLIENT_SECRET");
