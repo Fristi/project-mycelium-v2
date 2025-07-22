@@ -19,6 +19,7 @@ pnpm-debug.log*
 **/*.hex
 **/*.bin
 **/.sqlx
+**/.env
 
 # Logs, dumps, debug tools
 *.dump

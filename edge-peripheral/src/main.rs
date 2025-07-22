@@ -23,12 +23,12 @@ use esp_hal::{
     peripherals::{Peripherals, BT },
     rtc_cntl::sleep::{RtcSleepConfig, TimerWakeupSource}
 };
-use esp_hal::timer::timg::TimerGroup;
+use esp_hal::timer::timg::{self, TimerGroup};
 use esp_hal::{clock::CpuClock, time::Rate};
 use esp_wifi::ble::controller::BleConnector;
 use esp_wifi::{init, EspWifiController};
 use gauge::Gauge;
-use esp_println as _;
+use esp_println::{self as _, println};
 use heapless::Vec;
 use timeseries::Series;
 
@@ -74,7 +74,8 @@ async fn main(_spawner: Spawner) {
         DeviceBootArgs::Buffering { mut rtc, mut gauge, measurements, mut rng } => {
             info!("Buffering");
 
-            let measurement = random_measurement(&mut rng); // gauge.sample().await;
+            let measurement = gauge.sample().await;
+            info!("battery: {}, lux: {}, temperature: {}, humidity: {}", measurement.battery, measurement.lux, measurement.temperature, measurement.humidity);
             let mut new_measurements = (*measurements).clone();
             
             new_measurements.append_monotonic(rtc.current_time(), measurement);
@@ -104,7 +105,7 @@ async fn main(_spawner: Spawner) {
             
             ble::run(ble, &mut rtc, mac.clone(), entries).await;
 
-            let measurement = random_measurement(&mut rng); // gauge.sample().await;
+            let measurement = gauge.sample().await;
 
             let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
 
@@ -174,19 +175,19 @@ impl <'a> DeviceBootArgs<'a> {
         let mut rtc = Rtc::new(peripherals.LPWR);
         let rng = Rng::new(peripherals.RNG);
     
-        let timer0 = TimerGroup::new(peripherals.TIMG1);
-        esp_hal_embassy::init(timer0.timer0);
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_hal_embassy::init(timg0.timer1);
 
         info!("Embassy initialized!");
 
         match state {
             DeviceState::AwaitingTimeSync => {
         
-                let timer1 = TimerGroup::new(peripherals.TIMG0);
+                // let timg0 = TimerGroup::new(peripherals.TIMG0);
                 let esp_wifi_ctrl = &*mk_static!(
                     EspWifiController<'static>,
                     init(
-                        timer1.timer0,
+                        timg0.timer0,
                         rng,
                         peripherals.RADIO_CLK,
                     )
@@ -226,11 +227,11 @@ impl <'a> DeviceBootArgs<'a> {
             },
             DeviceState::Flush(measurements) => {
         
-                let timer1 = TimerGroup::new(peripherals.TIMG0);
+    
                 let esp_wifi_ctrl = &*mk_static!(
                     EspWifiController<'static>,
                     init(
-                        timer1.timer0,
+                        timg0.timer0,
                         rng,
                         peripherals.RADIO_CLK,
                     )

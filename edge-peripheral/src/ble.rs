@@ -104,7 +104,8 @@ where
 {
 
     let mut resources: HostResources<CONNECTIONS_MAX, L2CAP_CHANNELS_MAX, L2CAP_MTU> = HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(Address::random(address));
+    let address_ = Address::random([0xff, 0x8f, 0x1b, 0x05, 0xe4, 0xff]);
+    let stack = trouble_host::new(controller, &mut resources).set_random_address(address_);
     let Host {
         mut peripheral, runner, ..
     } = stack.build();
@@ -117,8 +118,6 @@ where
     .expect("Unable to start GATT service");
 
     info!("Starting adv and event loop");
-
-
     
     let _ = select(ble_task(runner), async {
         

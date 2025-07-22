@@ -1,12 +1,16 @@
+use std::pin::Pin;
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use btleplug::api::bleuuid::uuid_from_u16;
-use btleplug::api::{Central, Characteristic, Manager as _, Peripheral as _, WriteType};
+use btleplug::api::{
+    Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
+};
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use chrono::{DateTime, Utc};
 use edge_protocol::*;
 use futures::Stream;
-use anyhow::anyhow;
+use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 use crate::measurements::types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider};
@@ -19,7 +23,7 @@ const ADDRESS_SERVICE: Uuid = uuid_from_u16(ADDRESS_SERVICE_UUID_16);
 const ADDRESS_CHAR: Uuid = uuid_from_u16(ADDRESS_CHARACTERISTIC_UUID_16);
 
 pub struct BtleplugPeripheralSyncResultStreamProvider {
-    adapter: Arc<Adapter>
+    adapter: Arc<Adapter>,
 }
 
 impl BtleplugPeripheralSyncResultStreamProvider {
@@ -31,15 +35,27 @@ impl BtleplugPeripheralSyncResultStreamProvider {
             .nth(0)
             .ok_or(anyhow!("No adapter found"))?;
 
-        Ok(BtleplugPeripheralSyncResultStreamProvider { adapter: Arc::new(adapter) })
+        Ok(BtleplugPeripheralSyncResultStreamProvider {
+            adapter: Arc::new(adapter),
+        })
     }
 }
 
 impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamProvider {
-    fn stream(&self) -> impl Stream<Item = Vec<PeripheralSyncResult>> {
-        let stream = futures::stream::unfold(self.adapter.clone(), |adapter| async move {
+    fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>> {
+        let adapter = self.adapter.clone();
+        let stream = futures::stream::unfold(adapter, |adapter| async {
+            adapter
+                .start_scan(ScanFilter {
+                    services: vec![CURRENT_TIME_SERVICE],
+                })
+                .await
+                .ok()?;
+
             let peripherals = adapter.peripherals().await.ok()?;
             let mut results = vec![];
+
+            println!("Found {} peripherals", peripherals.len());
 
             for peripheral in peripherals {
                 let now = Utc::now();
@@ -47,16 +63,21 @@ impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamPr
                 results.push(result);
             }
 
+            sleep(Duration::from_secs(2)).await;
+
             Some((results, adapter))
         });
 
-        stream
+        Box::pin(stream)
     }
 }
 
 async fn sync(peripheral: Peripheral, now: DateTime<Utc>) -> anyhow::Result<PeripheralSyncResult> {
-
-    async fn find_characteristic_or_disconnect(peripheral: &Peripheral, service: Uuid, characteristic: Uuid) -> anyhow::Result<Characteristic> {
+    async fn find_characteristic_or_disconnect(
+        peripheral: &Peripheral,
+        service: Uuid,
+        characteristic: Uuid,
+    ) -> anyhow::Result<Characteristic> {
         let services = peripheral.services();
         let service = match services.iter().find(|s| s.uuid == service) {
             Some(s) => s,
@@ -66,11 +87,18 @@ async fn sync(peripheral: Peripheral, now: DateTime<Utc>) -> anyhow::Result<Peri
             }
         };
 
-        let characteristic = match service.characteristics.iter().find(|c| c.uuid == characteristic) {
+        let characteristic = match service
+            .characteristics
+            .iter()
+            .find(|c| c.uuid == characteristic)
+        {
             Some(c) => c,
             None => {
                 peripheral.disconnect().await?;
-                return Err(anyhow!("Device does not have {} characteristic", characteristic));
+                return Err(anyhow!(
+                    "Device does not have {} characteristic",
+                    characteristic
+                ));
             }
         };
 
@@ -81,45 +109,55 @@ async fn sync(peripheral: Peripheral, now: DateTime<Utc>) -> anyhow::Result<Peri
         peripheral.connect().await?;
     }
 
-    let address_char = find_characteristic_or_disconnect(&peripheral, ADDRESS_SERVICE, ADDRESS_CHAR).await?;
+    let address_char =
+        find_characteristic_or_disconnect(&peripheral, ADDRESS_SERVICE, ADDRESS_CHAR).await?;
     let data = peripheral.read(&address_char).await?;
-    let address: [u8; 6] = data.as_slice().try_into().map_err(|_| anyhow!("Address data is not 6 bytes"))?;
+    let address: [u8; 6] = data
+        .as_slice()
+        .try_into()
+        .map_err(|_| anyhow!("Address data is not 6 bytes"))?;
 
-    let current_time_char = find_characteristic_or_disconnect(&peripheral, CURRENT_TIME_SERVICE, CURRENT_TIME_CHAR).await?;
+    let current_time_char =
+        find_characteristic_or_disconnect(&peripheral, CURRENT_TIME_SERVICE, CURRENT_TIME_CHAR)
+            .await?;
     let data = peripheral.read(&current_time_char).await?;
     let bytes = data.as_slice();
     let current_time = CurrentTime::from_bytes(bytes);
-    let datetime = current_time.to_naivedatetime();                    
+    let datetime = current_time.to_naivedatetime();
 
     let duration = now.naive_utc() - datetime;
     let ct = CurrentTime::from_naivedatetime(now.naive_utc());
     let bytes = ct.to_bytes();
-    peripheral.write(&current_time_char, &bytes, WriteType::WithoutResponse).await?;
+    peripheral
+        .write(&current_time_char, &bytes, WriteType::WithoutResponse)
+        .await?;
 
-    let measurement_char = find_characteristic_or_disconnect(&peripheral, MEASUREMENT_SERVICE, MEASUREMENT_CHAR).await?;
+    let measurement_char =
+        find_characteristic_or_disconnect(&peripheral, MEASUREMENT_SERVICE, MEASUREMENT_CHAR)
+            .await?;
     let measurement_data = peripheral.read(&measurement_char).await?;
 
     if measurement_data.len() != 198 {
         peripheral.disconnect().await?;
         return Err(anyhow!("Measurement data is not 198 bytes"));
     }
-   
+
     let mut measurements = Vec::<MeasurementSerieEntry>::new();
-    
+
     for i in 0..6 {
         let start = i * 33;
         let end = start + 33;
         let segment = &measurement_data[start..end];
-        
+
         match MeasurementSerieEntry::from_tlv(segment) {
             Ok(entry) => measurements.push(entry),
-            Err(err) => println!("Error decoding measurement entry {:?}", err)
+            Err(err) => println!("Error decoding measurement entry {:?}", err),
         }
     }
 
     Ok(PeripheralSyncResult {
         address: address,
         time_drift: duration,
-        measurements: measurements
+        measurements: measurements,
     })
 }
