@@ -4,18 +4,17 @@ pub mod data;
 pub mod measurements;
 pub mod onboarding;
 
-use config::Config;
+use anyhow::Ok;
+use chrono::TimeDelta;
 use dotenv::dotenv;
 use futures::{stream, StreamExt};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
-use std::{str::FromStr, sync::Arc};
+use std::{iter, str::FromStr, sync::Arc};
 
 use crate::{
-    data::sqlite::{MeasurementSerieEntryRow, SqliteMeasurementRepository},
-    measurements::{
-        btleplug::BtleplugPeripheralSyncResultStreamProvider,
-        types::PeripheralSyncResultStreamProvider,
-    },
+    cfg::{AppConfig, OnboardingStrategy, PeripherhalSyncMode}, data::sqlite::{MeasurementSerieEntryRow, SqliteEdgeStateRepository, SqliteMeasurementRepository}, measurements::{
+        btleplug::BtleplugPeripheralSyncResultStreamProvider, random::RandomPeripheralSyncResultStreamProvider, types::PeripheralSyncResultStreamProvider
+    }, onboarding::{local::LocalOnboarding, types::Onboarding}
 };
 
 #[tokio::main]
@@ -29,21 +28,25 @@ async fn main() -> anyhow::Result<()> {
         .read_only(false);
 
     // use in a pool
-    let pool = SqlitePool::connect_with(opts).await?;
+    let pool = Arc::new(SqlitePool::connect_with(opts).await?);
 
-    sqlx::migrate!().run(&pool).await?;
+    sqlx::migrate!().run(&*pool).await?;
 
-    // let edge_state_repo = SqliteEdgeStateRepository::new(pool);
+    let edge_state_repo = SqliteEdgeStateRepository::new(pool.clone());
+    let edge_state = match edge_state_repo.get_state().await? {
+        Some(state) => {
+            state
+        },
+        None => {
+            let onboarding = make_onboarding(&app_config).await?;
+            let edge_state = onboarding.process().await?;
+            edge_state_repo.set_state(&edge_state).await?;
+            edge_state
+        }
+    };
 
-    // match edge_state_repo.get().await? {
-    //     Some(state) => (),
-    //     None => todo!()
-    // };
-
-    let repo = Arc::new(SqliteMeasurementRepository::new(pool));
-
-    let provider = BtleplugPeripheralSyncResultStreamProvider::new().await?;
-    let stream = provider.stream().flat_map(stream::iter).take(1);
+    let provider = make_peripheral_sync_stream_provider(&app_config.peripherhal_sync_mode).await?;
+    let stream = provider.stream().flat_map(stream::iter);
 
     stream
         .for_each(|m| async {
@@ -60,4 +63,31 @@ async fn main() -> anyhow::Result<()> {
         .await;
 
     Ok(())
+}
+
+async fn make_peripheral_sync_stream_provider(mode: &PeripherhalSyncMode) -> anyhow::Result<Box<dyn PeripheralSyncResultStreamProvider>> {
+    match mode {
+        PeripherhalSyncMode::Ble => {
+            let provider = BtleplugPeripheralSyncResultStreamProvider::new().await?;
+            Ok(Box::new(provider))
+        },
+        PeripherhalSyncMode::Random => {
+            let provider = RandomPeripheralSyncResultStreamProvider::new(
+                [0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa], 
+                TimeDelta::seconds(2)
+            );
+
+            Ok(Box::new(provider))
+        }
+    }
+}
+
+async fn make_onboarding(cfg: &AppConfig) -> anyhow::Result<Box<dyn Onboarding>> {
+    match cfg.onboarding_strategy {
+        OnboardingStrategy::Ble => todo!(),
+        OnboardingStrategy::Local => {
+            let onboarding = LocalOnboarding::new(cfg.auth0.clone(), cfg.wifi.clone());
+            Ok(Box::new(onboarding))
+        }
+    }
 }

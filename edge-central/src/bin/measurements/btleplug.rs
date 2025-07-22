@@ -1,3 +1,4 @@
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -41,9 +42,9 @@ impl BtleplugPeripheralSyncResultStreamProvider {
 }
 
 impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamProvider {
-    fn stream(&self) -> impl Stream<Item = Vec<PeripheralSyncResult>> {
-        let stream = futures::stream::unfold((), |_| async {
-            let adapter = self.adapter.clone();
+    fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>> {
+        let adapter = self.adapter.clone();
+        let stream = futures::stream::unfold(adapter, |adapter| async {
 
             adapter
                 .start_scan(ScanFilter {
@@ -65,10 +66,10 @@ impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamPr
 
             sleep(Duration::from_secs(2)).await;
 
-            Some((results, ()))
+            Some((results, adapter))
         });
 
-        stream
+        Box::pin(stream)
     }
 }
 

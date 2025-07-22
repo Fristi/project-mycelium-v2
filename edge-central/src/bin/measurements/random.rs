@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{pin::Pin, time::Duration};
 
 use chrono::{TimeDelta, Utc};
 use edge_protocol::{Measurement, MeasurementSerieEntry};
@@ -13,9 +13,19 @@ pub struct RandomPeripheralSyncResultStreamProvider {
     pub delay: TimeDelta,
 }
 
+impl RandomPeripheralSyncResultStreamProvider {
+    pub fn new(mac: [u8; 6], delay: TimeDelta) -> Self {
+        Self { mac, delay }
+    }
+}
+
+
 impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProvider {
-    fn stream(&self) -> impl Stream<Item = Vec<PeripheralSyncResult>> {
-        stream::unfold((), async move |_| {
+
+    fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>> {
+        let delay = Duration::from_millis(self.delay.num_milliseconds() as u64);
+        let mac = self.mac;
+        let stream = stream::unfold((delay, mac), |(delay, mac)| async move {
             let mut measurements = vec![];
 
             for _ in 0..6 {
@@ -29,15 +39,17 @@ impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProv
             }
 
             let result = PeripheralSyncResult {
-                address: self.mac,
+                address: mac,
                 time_drift: TimeDelta::zero(),
                 measurements,
             };
 
-            sleep(Duration::from_millis(self.delay.num_milliseconds() as u64)).await;
+            sleep(delay).await;
 
-            Some((vec![result], ()))
-        })
+            Some((vec![result], (delay, mac)))
+        });
+
+        Box::pin(stream)
     }
 }
 

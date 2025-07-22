@@ -1,8 +1,10 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use std::sync::Arc;
+
+use chrono::NaiveDateTime;
 use edge_protocol::MeasurementSerieEntry;
 use sqlx::SqlitePool;
 
-use crate::data::types::{EdgeState, EdgeStateRepository, MeasurementRepository};
+use crate::data::types::{EdgeState};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct MeasurementSerieEntryRow {
@@ -80,17 +82,15 @@ impl EdgeStateRow {
 }
 
 pub struct SqliteEdgeStateRepository {
-    pool: SqlitePool,
+    pool: Arc<SqlitePool>,
 }
 
 impl SqliteEdgeStateRepository {
-    pub fn new(pool: SqlitePool) -> Self {
+    pub fn new(pool: Arc<SqlitePool>) -> Self {
         Self { pool }
     }
-}
 
-impl EdgeStateRepository for SqliteEdgeStateRepository {
-    async fn get(&self) -> anyhow::Result<Option<EdgeState>> {
+    pub async fn get_state(&self) -> anyhow::Result<Option<EdgeState>> {
         let row: Option<EdgeStateRow> = sqlx::query_as(
             "
             SELECT id, wifi_ssid, wifi_password, auth0_access_token, auth0_refresh_token, auth0_expires_at
@@ -98,13 +98,13 @@ impl EdgeStateRepository for SqliteEdgeStateRepository {
             LIMIT 1
             "
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(&*self.pool)
         .await?;
 
         Ok(row.map(|r| r.to_edge_state()))
     }
 
-    async fn set(&self, state: &EdgeState) -> anyhow::Result<u64> {
+    pub async fn set_state(&self, state: &EdgeState) -> anyhow::Result<u64> {
         let row = EdgeStateRow::from_edge_state(&state);
 
         let res = sqlx::query(
@@ -125,7 +125,7 @@ impl EdgeStateRepository for SqliteEdgeStateRepository {
         .bind(row.auth0_access_token)
         .bind(row.auth0_refresh_token)
         .bind(row.auth0_expires_at)
-        .execute(&self.pool)
+        .execute(&*self.pool)
         .await?;
 
         Ok(res.rows_affected())
@@ -133,17 +133,15 @@ impl EdgeStateRepository for SqliteEdgeStateRepository {
 }
 
 pub struct SqliteMeasurementRepository {
-    pool: SqlitePool,
+    pool: Arc<SqlitePool>,
 }
 
 impl SqliteMeasurementRepository {
-    pub fn new(pool: SqlitePool) -> Self {
+    pub fn new(pool: Arc<SqlitePool>) -> Self {
         Self { pool }
     }
-}
 
-impl MeasurementRepository for SqliteMeasurementRepository {
-    async fn insert(
+    pub async fn insert(
         &self,
         mac: &[u8; 6],
         entries: Vec<edge_protocol::MeasurementSerieEntry>,
@@ -176,7 +174,7 @@ impl MeasurementRepository for SqliteMeasurementRepository {
         Ok(inserted)
     }
 
-    async fn find_by_mac(&self, mac: &[u8; 6]) -> anyhow::Result<Vec<MeasurementSerieEntry>> {
+    pub async fn find_by_mac(&self, mac: &[u8; 6]) -> anyhow::Result<Vec<MeasurementSerieEntry>> {
         let mac_ref = mac.as_ref();
         let rows: Vec<MeasurementSerieEntryRow> = sqlx::query_as(
             "
@@ -186,7 +184,7 @@ impl MeasurementRepository for SqliteMeasurementRepository {
             ",
         )
         .bind(mac_ref)
-        .fetch_all(&self.pool)
+        .fetch_all(&*self.pool)
         .await?;
 
         Ok(rows

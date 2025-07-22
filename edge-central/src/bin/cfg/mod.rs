@@ -1,21 +1,21 @@
 use config::Config;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum OnboardingStrategy {
     Ble,
     Local,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum PeripherhalSyncMode {
     Ble,
     Random,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Auth0Config {
     pub domain: String,
     pub client_id: String,
@@ -24,7 +24,7 @@ pub struct Auth0Config {
     pub audience: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct WifiConfig {
     pub ssid: String,
     pub password: String,

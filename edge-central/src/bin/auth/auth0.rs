@@ -1,5 +1,7 @@
 use serde::{de::DeserializeOwned, Deserialize};
 
+use crate::cfg::Auth0Config;
+
 #[derive(Deserialize, Debug)]
 pub struct DeviceCodeResponse {
     pub device_code: String,
@@ -66,19 +68,12 @@ where
     Ok(res)
 }
 
-const DEFAULT_AUTH0_DOMAIN: &str = "mycelium-greens.eu.auth0.com";
-const DEFAULT_AUTH0_CLIENT_ID: &str = "i9p7v3jAPo8z6mwiuCt6IB5dGNAG1xaz";
-
-pub async fn refresh_token(refresh_token: &str) -> anyhow::Result<TokenResult> {
-    let domain = option_env!("AUTH0_DOMAIN").unwrap_or(DEFAULT_AUTH0_DOMAIN);
-    let client_id = option_env!("AUTH0_CLIENT_ID").unwrap_or(DEFAULT_AUTH0_CLIENT_ID);
-    let client_secret = option_env!("AUTH0_CLIENT_SECRET")
-        .unwrap_or("zp-7XzX4rP-ihysBSPoF2fXLfQRAxv2WnJEw-dp4f2LEa_rN8T2gU4fU-OqxWg4I");
+pub async fn refresh_token(cfg: &Auth0Config, refresh_token: &str) -> anyhow::Result<TokenResult> {
     post_form(
-        &format!("https://{}/oauth/token", domain),
+        &format!("https://{}/oauth/token", &cfg.domain),
         [
-            ("client_id", client_id),
-            ("client_secret", client_secret),
+            ("client_id", &cfg.client_id),
+            ("client_secret", &cfg.client_secret),
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),
         ],
@@ -86,13 +81,11 @@ pub async fn refresh_token(refresh_token: &str) -> anyhow::Result<TokenResult> {
     .await
 }
 
-pub async fn poll_token(device_code: &str) -> anyhow::Result<TokenResult> {
-    let domain = option_env!("AUTH0_DOMAIN").unwrap_or(DEFAULT_AUTH0_DOMAIN);
-    let client_id = option_env!("AUTH0_CLIENT_ID").unwrap_or(DEFAULT_AUTH0_CLIENT_ID);
+pub async fn poll_token(cfg: &Auth0Config, device_code: &str) -> anyhow::Result<TokenResult> {
     post_form(
-        &format!("https://{}/oauth/token", domain),
+        &format!("https://{}/oauth/token", &cfg.domain),
         [
-            ("client_id", client_id),
+            ("client_id", &cfg.client_id),
             ("device_code", device_code),
             ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
         ],
@@ -100,18 +93,13 @@ pub async fn poll_token(device_code: &str) -> anyhow::Result<TokenResult> {
     .await
 }
 
-pub async fn request_device_code() -> anyhow::Result<DeviceCodeResponse> {
-    let domain = option_env!("AUTH0_DOMAIN").unwrap_or(DEFAULT_AUTH0_DOMAIN);
-    let client_id = option_env!("AUTH0_CLIENT_ID").unwrap_or(DEFAULT_AUTH0_CLIENT_ID);
-    let scope = option_env!("AUTH0_SCOPE").unwrap_or("offline_access");
-    let audience = option_env!("AUTH0_AUDIENCE").unwrap_or("mycelium.co");
-
+pub async fn request_device_code(cfg: &Auth0Config) -> anyhow::Result<DeviceCodeResponse> {
     post_form(
-        &format!("https://{}/oauth/device/code", domain),
+        &format!("https://{}/oauth/device/code", &cfg.domain),
         [
-            ("client_id", client_id),
-            ("scope", scope),
-            ("audience", audience),
+            ("client_id", &cfg.client_id),
+            ("scope", &cfg.scope),
+            ("audience", &cfg.audience),
         ],
     )
     .await

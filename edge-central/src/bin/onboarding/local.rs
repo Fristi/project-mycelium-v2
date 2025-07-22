@@ -1,32 +1,29 @@
+use async_trait::async_trait;
 use chrono::Utc;
 use tokio::time::{sleep, Duration};
 use wifi_rs::prelude::Connectivity;
 
 use crate::{
-    auth::auth0::{TokenResult, TokenStatus},
-    data::types::EdgeState,
-    onboarding::types::Onboarding,
+    auth::auth0::{TokenResult, TokenStatus}, cfg::{Auth0Config, WifiConfig}, data::types::EdgeState, onboarding::types::Onboarding
 };
 
 pub struct LocalOnboarding {
-    wifi_ssid: String,
-    wifi_password: String,
+    auth0: Auth0Config,
+    wifi: WifiConfig
 }
 
 impl LocalOnboarding {
-    pub fn new(wifi_ssid: String, wifi_password: String) -> Self {
-        Self {
-            wifi_ssid,
-            wifi_password,
-        }
+    pub fn new(auth0: Auth0Config, wifi: WifiConfig) -> Self {
+        Self { auth0, wifi }
     }
 }
 
+#[async_trait]
 impl Onboarding for LocalOnboarding {
     async fn process(&self) -> anyhow::Result<EdgeState> {
         let mut wifi = wifi_rs::WiFi::new(None);
         let wifi_connection = wifi
-            .connect(&self.wifi_ssid, &self.wifi_password)
+            .connect(&self.wifi.ssid, &self.wifi.password)
             .unwrap_or(false);
 
         if !wifi_connection {
@@ -35,7 +32,7 @@ impl Onboarding for LocalOnboarding {
 
         sleep(Duration::from_secs(3)).await;
 
-        let device_code = crate::auth::auth0::request_device_code().await?;
+        let device_code = crate::auth::auth0::request_device_code(&self.auth0).await?;
 
         println!("Verification code: {}", device_code.user_code);
         println!(
@@ -44,7 +41,7 @@ impl Onboarding for LocalOnboarding {
         );
 
         loop {
-            match crate::auth::auth0::poll_token(device_code.device_code.as_str()).await {
+            match crate::auth::auth0::poll_token(&self.auth0, device_code.device_code.as_str()).await {
                 Ok(TokenResult::Full {
                     access_token,
                     refresh_token,
@@ -52,8 +49,8 @@ impl Onboarding for LocalOnboarding {
                 }) => {
                     let expires_at = Utc::now() + Duration::from_millis(expires_in);
                     return Ok(EdgeState {
-                        wifi_ssid: self.wifi_ssid.clone(),
-                        wifi_password: self.wifi_password.clone(),
+                        wifi_ssid: self.wifi.ssid.clone(),
+                        wifi_password: self.wifi.password.clone(),
                         auth0_access_token: access_token,
                         auth0_refresh_token: refresh_token,
                         auth0_expires_at: expires_at.naive_utc(),
