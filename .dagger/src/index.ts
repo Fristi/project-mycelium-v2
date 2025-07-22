@@ -102,7 +102,7 @@ export class MyceliumBuild {
    */
   execPeripheralWithEnv(arch: string, command: string): Container {
     return this.containerPeripheral(arch)
-      .withExec(["bash", "-c", `source ~/export-esp.sh && ${command}`]);
+      .withExec(["bash", "-c", `source /root/export-esp.sh && ${command}`]);
   }
   
 
@@ -122,6 +122,15 @@ export class MyceliumBuild {
   async testCentral(): Promise<string> {
     return this.containerCentral()
       .withExec(["cargo", "test"]).stdout();
+  }
+
+  /**
+   * Run Clippy linting on the central component
+   */
+  @func()
+  async lintCentral(): Promise<string> {
+    return this.containerCentral()
+      .withExec(["cargo", "clippy", "--", "-D", "warnings"]).stdout();
   }
 
   /**
