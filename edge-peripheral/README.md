@@ -60,6 +60,7 @@ The device operates in three main states:
 - Rust 1.88+ with ESP32 target support
 - ESP toolchain installed via `espup`
 - USB-to-serial programmer
+- Embassy async runtime for embedded systems
 
 ### Setup ESP Environment
 
@@ -83,8 +84,10 @@ cargo run --release
 
 ```bash
 # Build using Dagger (containerized)
-dagger call build-peripheral
+dagger call build-peripheral --arch=linux/arm64
 ```
+
+Note: The Dagger build supports multiple architectures. Use `--arch=linux/amd64` for x86_64 systems or `--arch=linux/arm64` for ARM64 systems.
 
 ### Programmer Selection
 
@@ -93,6 +96,18 @@ When flashing, select the appropriate programmer:
 ```
 /dev/tty.usbserial-11103 - Quad RS232-HS
 ```
+
+### Key Dependencies
+
+The firmware uses several specialized crates:
+
+- **Embassy**: Async runtime for embedded systems with task scheduling
+- **esp-hal**: Hardware abstraction layer for ESP32
+- **esp-wifi**: WiFi and Bluetooth Low Energy support
+- **trouble-host**: Bluetooth Host stack implementation
+- **shtcx**: Temperature/humidity sensor driver (custom fork)
+- **bh1730fvc**: Ambient light sensor driver (custom fork)
+- **timeseries**: Time series data compression and storage (custom fork)
 
 ### Configuration
 

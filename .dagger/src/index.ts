@@ -46,6 +46,53 @@ export class MyceliumBuild {
   }
 
   /**
+   * Container for building the Tauri app
+   */
+  containerApp(): Container {
+    const src = this.source;
+
+    let container = dag
+      .container()
+      .from("rust:1.88-bookworm")
+      .withExec(["apt-get", "install", "-y", "curl", "ca-certificates", "gnupg"])
+      .withExec(["bash", "-c", "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"])
+      .withExec(["apt-get", "update"])      
+      .withExec([
+        "apt-get",
+        "install",
+        "-y",
+        "libwebkit2gtk-4.1-dev",
+        "build-essential",
+        "wget",
+        "file",
+        "libxdo-dev",
+        "libssl-dev",
+        "libayatana-appindicator3-dev",
+        "librsvg2-dev",
+        "xdg-utils",
+        "nodejs"
+      ])
+      .withMountedCache("/root/.cargo", dag.cacheVolume("cargo-tauri"))
+      .withMountedCache("/root/.npm", dag.cacheVolume("npm-tauri"))
+      .withDirectory("/workspace", src)
+      .withWorkdir("/workspace/app");
+
+    return container;
+  }
+
+  /**
+   * Build the Tauri app for a specific platform
+   */
+  @func()
+  async buildApp(): Promise<string> {
+    return this.containerApp()
+      .withExec(["bash", "-c", "npm install && npm run tauri build"])
+      .stdout();
+  }
+
+  
+
+  /**
    * Container for building the central component with dbus support
    */
   containerCentral(): Container {
@@ -135,7 +182,8 @@ export class MyceliumBuild {
   async ci(@argument() arch: string = "linux/amd64") {
     await Promise.all([
       this.buildPeripheral(arch),
-      this.testCentral()
+      this.testCentral(),
+      this.buildApp()
     ]);
 
     return "CI pipeline completed successfully";

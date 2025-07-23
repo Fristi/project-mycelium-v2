@@ -4,7 +4,7 @@
 
 The mycelium project is a plant monitoring system that automatically monitors
 environmental conditions in households and gardens using IoT edge devices. The
-system consists of three main components:
+system consists of four main components:
 
 ## Architecture
 
@@ -17,6 +17,9 @@ system consists of three main components:
 - **edge-protocol** - Shared protocol library that defines the communication
   format between peripheral and central devices using TLV (Type-Length-Value)
   encoding
+- **app** - Cross-platform desktop application built with Tauri (Rust + React)
+  that provides a user interface for monitoring and managing the plant monitoring
+  system
 
 ## Getting Started
 
@@ -24,6 +27,7 @@ system consists of three main components:
 
 - Rust toolchain with embedded targets (1.88+)
 - ESP32 development environment with espup
+- Node.js 20+ (for Tauri desktop app)
 - Auth0 account for authentication
 - Dagger CLI (optional, for local CI testing)
 
@@ -83,13 +87,18 @@ cd edge-peripheral
 . ~/export-esp.sh
 cargo build --release
 
+# Build desktop app
+cd app
+npm install
+npm run tauri build
+
 # Run tests
 cargo test -p edge-central
 ```
 
 ### Dagger CI
 
-The CI pipeline builds both components in isolated containers:
+The CI pipeline builds all components in isolated containers:
 
 ```bash
 # Run full CI pipeline locally, you can include --arch=linux/arm64 or --arch=linux/amd64 depending on your platform
@@ -97,7 +106,8 @@ dagger call ci
 
 # Build individual components
 dagger call build-central
-dagger call build-peripheral
+dagger call build-peripheral --arch=linux/arm64
+dagger call build-app
 
 # Run tests
 dagger call test-central
@@ -108,7 +118,32 @@ dagger call test-central
 The project uses GitHub Actions with Dagger for CI. The workflow:
 1. Builds the central component with dbus support
 2. Builds the peripheral component with ESP32 toolchain
-3. Runs all tests
+3. Builds the Tauri desktop application
+4. Runs all tests
+
+The CI pipeline is configured to run on push events, ensuring code quality across all components.
+
+## Project Structure
+
+```
+mycelium/
+├── edge-central/          # Central hub (Rust)
+│   ├── src/bin/          # Binary executables
+│   ├── migrations/       # Database schema migrations
+│   └── Cargo.toml        # Dependencies and configuration
+├── edge-peripheral/       # ESP32 sensor device (Rust)
+│   ├── src/              # Firmware source code
+│   ├── .cargo/           # Cargo configuration for ESP32
+│   └── rust-toolchain.toml # Rust toolchain specification
+├── edge-protocol/         # Shared protocol library (Rust)
+│   └── src/lib.rs        # Protocol definitions and TLV encoding
+├── app/                   # Desktop application (Tauri + React)
+│   ├── src/              # React frontend source
+│   ├── src-tauri/        # Tauri Rust backend
+│   └── package.json      # Node.js dependencies
+└── .dagger/              # CI/CD pipeline (TypeScript)
+    └── src/index.ts      # Dagger build configuration
+```
 
 ## Development Notes
 
@@ -130,6 +165,26 @@ Configuration enums:
 - The project requires specific Rust version (1.88+) for ESP32 compatibility
 - ESP toolchain setup requires manual environment sourcing
 - Some git dependencies may require specific revisions for compatibility
+
+## Desktop Application
+
+The project includes a cross-platform desktop application built with Tauri that provides a graphical interface for the plant monitoring system.
+
+### Features
+
+- Real-time monitoring of connected edge devices
+- Historical data visualization
+- System configuration management
+- Authentication and cloud integration controls
+
+### Development
+
+```bash
+cd app
+npm install
+npm run dev  # Start development server
+npm run tauri dev  # Start Tauri development mode
+```
 
 ### Testing
 
