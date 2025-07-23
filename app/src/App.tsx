@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "react-query";
 import Shell from "./Shell";
 
+const queryClient = new QueryClient();
+
 const App: React.FC = () => {
   // const { handleRedirectCallback } = useAuth0();
-  const queryClient = new QueryClient();
 
   // useEffect(() => {
   //   // Handle the 'appUrlOpen' event and call `handleRedirectCallback`

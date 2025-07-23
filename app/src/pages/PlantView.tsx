@@ -84,7 +84,7 @@ const PlantLog = (props: PlantLogProps) => {
     }
   };
 
-  const renderPlantLog = (log: [StationLog]) => {
+  const renderPlantLog = (log: StationLog[]) => {
     return (
       <div className="flow-root">
         <ul role="list" className="-mb-8">

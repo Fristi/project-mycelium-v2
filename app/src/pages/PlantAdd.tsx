@@ -128,7 +128,7 @@ export const PlantAdd = () => {
   const queryClient = useQueryClient();
   const form = useFormik({
     enableReinitialize: true,
-    initialValues: { name: "test", location: "test", description: "test", wifi_ssid: "Skynet", wifi_password: "Scheepsrecht*3" },
+    initialValues: { name: "", location: "", description: "", wifi_ssid: "", wifi_password: "" },
     validationSchema: toFormikValidationSchema(AddPlantSchema),
     onSubmit: (_values: PlantAdd) => {
       queryClient.invalidateQueries("plants");
@@ -154,7 +154,7 @@ export const PlantAdd = () => {
       <form className="space-y-10 divide-y divide-gray-900/10" onSubmit={form.handleSubmit}>
         <div className="mt-5 lg:mt-6 bg-white shadow sm:rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <div className="rid grid-cols-1 gap-x-8 gap-y-8 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-8 md:grid-cols-3">
               <div>
                 <div>
                   <h3 className="text-lg leading-6 font-medium text-gray-900">Plant basics</h3>
@@ -178,7 +178,7 @@ export const PlantAdd = () => {
                   name="location"
                   label="Location"
                   placeholder="Living ..."
-                  value={form.values.name}
+                  value={form.values.location}
                   onChange={form.handleChange}
                   helperText="Location is required"
                 />

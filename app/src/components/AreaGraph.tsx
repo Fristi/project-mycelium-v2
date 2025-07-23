@@ -13,7 +13,7 @@ type Props = {
 };
 
 function formatDate(tickItem: string) {
-  return moment(tickItem).format("MMM Do YYYY HH:MM");
+  return moment(tickItem).format("MMM Do YYYY HH:mm");
 }
 
 export default (props: Props) => {
