@@ -80,7 +80,6 @@ export class MyceliumBuild {
       .withExec(["sbt", "test"])
       .stdout();
   }
-  
 
   /**
    * Container for building the Tauri app
@@ -126,8 +125,6 @@ export class MyceliumBuild {
       .withExec(["bash", "-c", "npm install && npm run tauri build"])
       .stdout();
   }
-
-  
 
   /**
    * Container for building the central component with dbus support
@@ -187,7 +184,6 @@ export class MyceliumBuild {
     return this.containerPeripheral(arch)
       .withExec(["bash", "-c", `source /root/export-esp.sh && ${command}`]);
   }
-  
 
   /**
    * Build the central component
@@ -220,8 +216,9 @@ export class MyceliumBuild {
     await Promise.all([
       this.buildPeripheral(arch),
       this.testCentral(),
-      this.buildApp(),
-      this.testBackend()
+      this.buildBackend(),
+      this.testBackend(),
+      this.buildApp()
     ]);
 
     return "CI pipeline completed successfully";

@@ -2,21 +2,23 @@
 
 ![mycelium logo](/logo-mycelium.jpg)
 
-The mycelium project is a plant monitoring system that automatically monitors
+The mycelium project is a comprehensive plant monitoring system that automatically monitors
 environmental conditions in households and gardens using IoT edge devices. The
-system consists of four main components:
+system consists of five main components:
 
 ## Architecture
 
 - **edge-peripheral** - ESP32-based sensor device that collects environmental
-  measurements (temperature, humidity, light, battery level) using deep sleep
+  measurements (temperature, humidity, light, battery level, soil moisture, tank levels) using deep sleep
   and Bluetooth Low Energy (BLE) for power optimization
-- **edge-central** - Central hub that continuously scans for peripheral devices,
-  collects measurements, manages time synchronization, and handles data
-  persistence with cloud integration
-- **edge-protocol** - Shared protocol library that defines the communication
+- **edge-central** - Rust-based central hub that continuously scans for peripheral devices,
+  collects measurements, manages time synchronization, and handles local data
+  persistence with cloud synchronization
+- **edge-protocol** - Shared Rust protocol library that defines the communication
   format between peripheral and central devices using TLV (Type-Length-Value)
   encoding
+- **backend** - Scala-based cloud backend service with REST API, PostgreSQL database,
+  Auth0 authentication, and comprehensive plant management features
 - **app** - Cross-platform desktop application built with Tauri (Rust + React)
   that provides a user interface for monitoring and managing the plant monitoring
   system
@@ -27,11 +29,15 @@ system consists of four main components:
 
 - Rust toolchain with embedded targets (1.88+)
 - ESP32 development environment with espup
+- Scala 2.13+ and sbt (for backend service)
+- PostgreSQL database (for backend)
 - Node.js 20+ (for Tauri desktop app)
 - Auth0 account for authentication
 - Dagger CLI (optional, for local CI testing)
 
 ### Configuration
+
+#### Edge Central Configuration
 
 Copy `edge-central/.env.sample` to `edge-central/.env` and configure:
 
@@ -49,7 +55,17 @@ APP.WIFI.SSID=your-wifi-ssid
 APP.WIFI.PASSWORD=your-wifi-password
 ```
 
-The configuration system uses the `config` crate with environment variable support. All settings use the `APP` prefix with dot notation for hierarchical configuration.
+The edge-central configuration system uses the `config` crate with environment variable support. All settings use the `APP` prefix with dot notation for hierarchical configuration.
+
+#### Backend Configuration
+
+The Scala backend uses environment variables and application.conf for configuration:
+
+- **Database**: PostgreSQL connection via JDBC
+- **Authentication**: Auth0 JWT validation
+- **CORS**: Configured for cross-origin requests
+- **File Storage**: Local file system for avatar images
+- **Logging**: Logback with structured logging
 
 ### Auth0 Configuration
 
@@ -64,13 +80,6 @@ application for production use:
 
 The application uses the dotenv crate to load environment variables from the
 `.env` file at runtime.
-
-### Database Configuration
-
-The central application uses SQLite with Write-Ahead Logging (WAL) mode for improved
-performance and concurrency. The database file is created automatically if it
-doesn't exist, and migrations are applied at startup.
-
 ## Build System & CI
 
 The project uses [Dagger](https://dagger.io/) for containerized builds and CI/CD. The build configuration is defined in TypeScript at `.dagger/src/index.ts`.
@@ -78,14 +87,20 @@ The project uses [Dagger](https://dagger.io/) for containerized builds and CI/CD
 ### Local Development
 
 ```bash
-# Build central component
-cargo build --release -p edge-central
+# Build edge-central component
+cd edge-central
+cargo build --release
 
-# Build peripheral component (requires ESP toolchain)
+# Build edge-peripheral component (requires ESP toolchain)
 cd edge-peripheral
 # source some paths needed for xtensa toolchain
 . ~/export-esp.sh
 cargo build --release
+
+# Build backend service
+cd backend
+sbt compile
+sbt run  # Starts server on port 8080
 
 # Build desktop app
 cd app
@@ -93,7 +108,8 @@ npm install
 npm run tauri build
 
 # Run tests
-cargo test -p edge-central
+cd edge-central && cargo test
+cd backend && sbt test
 ```
 
 ### Dagger CI
@@ -107,19 +123,22 @@ dagger call ci
 # Build individual components
 dagger call build-central
 dagger call build-peripheral --arch=linux/arm64
+dagger call build-backend
 dagger call build-app
 
 # Run tests
 dagger call test-central
+dagger call test-backend
 ```
 
 ### GitHub Actions
 
 The project uses GitHub Actions with Dagger for CI. The workflow:
-1. Builds the central component with dbus support
-2. Builds the peripheral component with ESP32 toolchain
-3. Builds the Tauri desktop application
-4. Runs all tests
+1. Builds the edge-central component with dbus support
+2. Builds the edge-peripheral component with ESP32 toolchain
+3. Builds the Scala backend service
+4. Builds the Tauri desktop application
+5. Runs all tests across components
 
 The CI pipeline is configured to run on push events, ensuring code quality across all components.
 
@@ -129,7 +148,7 @@ The CI pipeline is configured to run on push events, ensuring code quality acros
 mycelium/
 ├── edge-central/          # Central hub (Rust)
 │   ├── src/bin/          # Binary executables
-│   ├── migrations/       # Database schema migrations
+│   ├── migrations/       # SQLite schema migrations
 │   └── Cargo.toml        # Dependencies and configuration
 ├── edge-peripheral/       # ESP32 sensor device (Rust)
 │   ├── src/              # Firmware source code
@@ -137,6 +156,10 @@ mycelium/
 │   └── rust-toolchain.toml # Rust toolchain specification
 ├── edge-protocol/         # Shared protocol library (Rust)
 │   └── src/lib.rs        # Protocol definitions and TLV encoding
+├── backend/               # Cloud backend service (Scala)
+│   ├── src/main/scala/   # Scala source code
+│   ├── src/main/resources/migrations/ # PostgreSQL Flyway migrations
+│   └── build.sbt         # SBT build configuration
 ├── app/                   # Desktop application (Tauri + React)
 │   ├── src/              # React frontend source
 │   ├── src-tauri/        # Tauri Rust backend
@@ -166,6 +189,28 @@ Configuration enums:
 - ESP toolchain setup requires manual environment sourcing
 - Some git dependencies may require specific revisions for compatibility
 
+## API Documentation
+
+### Backend REST API
+
+The Scala backend provides a comprehensive REST API for plant monitoring:
+
+**Authentication**: Auth0 JWT Bearer tokens required for all endpoints
+
+**Base URL**: `http://localhost:8080/api` (development)
+
+**Data Models**:
+- **Station**: Plant metadata, location, watering schedule
+- **StationMeasurement**: Sensor readings (temperature, humidity, lux, soil/tank pF, battery)
+- **WateringSchedule**: Interval-based or threshold-based watering logic
+- **StationLog**: Event history (watering, schedule changes)
+
+### Edge Protocol
+
+The edge devices communicate using a custom TLV (Type-Length-Value) protocol over BLE:
+- Time synchronization between central and peripheral
+- Compressed time series data transmission
+
 ## Desktop Application
 
 The project includes a cross-platform desktop application built with Tauri that provides a graphical interface for the plant monitoring system.
@@ -173,9 +218,11 @@ The project includes a cross-platform desktop application built with Tauri that 
 ### Features
 
 - Real-time monitoring of connected edge devices
-- Historical data visualization
-- System configuration management
-- Authentication and cloud integration controls
+- Historical data visualization with interactive charts
+- Plant management (add, edit, delete stations)
+- Watering schedule configuration (interval/threshold based)
+- Authentication via Auth0
+- Cloud synchronization with backend API
 
 ### Development
 
@@ -188,11 +235,14 @@ npm run tauri dev  # Start Tauri development mode
 
 ### Testing
 
-The project includes comprehensive tests for the data layer:
+The project includes comprehensive tests across all components:
 
 ```bash
-# Run all tests
+# Run Rust tests (edge-central, edge-protocol)
 cargo test
+
+# Run Scala backend tests
+cd backend && sbt test
 
 # Run tests for specific component
 cargo test -p edge-central
