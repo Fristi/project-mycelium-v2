@@ -3,11 +3,11 @@ import { toFormikValidationSchema } from "zod-formik-adapter";
 import { AddPlantSchema } from "../schemas";
 import * as z from "zod";
 import { useQueryClient } from "react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import InputField from "../components/InputField";
 import { PrimaryButton } from "../components/PrimaryButton";
 import TextArea from "../components/TextArea";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckCircleIcon, ExclamationCircleIcon, PauseCircleIcon, UserIcon, WifiIcon } from "@heroicons/react/24/outline";
 
 type PlantAdd = z.infer<typeof AddPlantSchema>;
@@ -54,36 +54,36 @@ export const PlantProvisioning = () => {
 
   if(deviceId == null) return (<p>Invalid device id</p>)
 
-  const [state, setState] = useState<OnboardingState>({ _type: "AwaitingSettings" });
-  const navigate = useNavigate();
+  const [state, _setState] = useState<OnboardingState>({ _type: "AwaitingSettings" });
+  // const navigate = useNavigate();
 
-  const decodeState = (data: DataView) => {
-    const decoder = new TextDecoder();
-    const res: OnboardingState = JSON.parse(decoder.decode(data));
-    return res;
-  };
+  // const _decodeState = (data: DataView) => {
+  //   const decoder = new TextDecoder();
+  //   const res: OnboardingState = JSON.parse(decoder.decode(data));
+  //   return res;
+  // };
   
   const handleOnClickFinish = () => {
-    const worker = async () => {
-      await BleClient.connect(deviceId);
-      ExecuteCommand(deviceId, { "_type": "Reboot"});
-      await BleClient.disconnect(deviceId);
-    }
+    // const worker = async () => {
+    //   await BleClient.connect(deviceId);
+    //   ExecuteCommand(deviceId, { "_type": "Reboot"});
+    //   await BleClient.disconnect(deviceId);
+    // }
     
-    worker()
-        .catch(err => console.error(err))
-        .finally(() => navigate("/"));
+    // worker()
+    //     .catch(err => console.error(err))
+    //     .finally(() => navigate("/"));
   }
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      await BleClient.connect(deviceId);
-      const stateBytes = await BleClient.read(deviceId, MYCELIUM_SERVICE, MYCELIUM_STATE_SERVICE);
-      await BleClient.disconnect(deviceId);
-      setState(decodeState(stateBytes));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  // useEffect(() => {
+  //   const interval = setInterval(async () => {
+  //     await BleClient.connect(deviceId);
+  //     const stateBytes = await BleClient.read(deviceId, MYCELIUM_SERVICE, MYCELIUM_STATE_SERVICE);
+  //     await BleClient.disconnect(deviceId);
+  //     setState(decodeState(stateBytes));
+  //   }, 1000);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   if(state._type == "AwaitingAuthorization") {
     return (
@@ -124,16 +124,16 @@ export const PlantProvisioning = () => {
 }
 
 export const PlantAdd = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const queryClient = useQueryClient();
   const form = useFormik({
     enableReinitialize: true,
     initialValues: { name: "test", location: "test", description: "test", wifi_ssid: "Skynet", wifi_password: "Scheepsrecht*3" },
     validationSchema: toFormikValidationSchema(AddPlantSchema),
-    onSubmit: (values: PlantAdd) => {
+    onSubmit: (_values: PlantAdd) => {
       queryClient.invalidateQueries("plants");
 
-      const command = { "_type": "Initialize", "settings": values };
+      // const command = { "_type": "Initialize", "settings": values };
 
       // const worker = async () => {
       //   await BleClient.initialize();

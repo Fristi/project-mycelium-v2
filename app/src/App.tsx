@@ -1,10 +1,8 @@
-import { useEffect } from "react";
-import { useAuth0 } from "@auth0/auth0-react";
 import { QueryClient, QueryClientProvider } from "react-query";
 import Shell from "./Shell";
 
 const App: React.FC = () => {
-  const { handleRedirectCallback } = useAuth0();
+  // const { handleRedirectCallback } = useAuth0();
   const queryClient = new QueryClient();
 
   // useEffect(() => {
