@@ -48,41 +48,34 @@ export class MyceliumBuild {
   /**
    * Container for building the Tauri app
    */
-  containerApp(platform: string): Container {
+  containerApp(): Container {
     const src = this.source;
+
     let container = dag
       .container()
-      .from("node:20-bookworm")
-      .withExec(["apt-get", "update"])
+      .from("rust:1.88-bookworm")
+      .withExec(["apt-get", "install", "-y", "curl", "ca-certificates", "gnupg"])
+      .withExec(["bash", "-c", "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"])
+      .withExec(["apt-get", "update"])      
       .withExec([
         "apt-get",
         "install",
         "-y",
-        "libwebkit2gtk-4.0-dev",
+        "libwebkit2gtk-4.1-dev",
         "build-essential",
-        "curl",
         "wget",
+        "file",
+        "libxdo-dev",
         "libssl-dev",
-        "libgtk-3-dev",
         "libayatana-appindicator3-dev",
         "librsvg2-dev",
+        "xdg-utils",
+        "nodejs"
       ])
       .withMountedCache("/root/.cargo", dag.cacheVolume("cargo-tauri"))
       .withMountedCache("/root/.npm", dag.cacheVolume("npm-tauri"))
       .withDirectory("/workspace", src)
       .withWorkdir("/workspace/app");
-
-    // Add platform-specific configurations
-    if (platform === "macos") {
-      return container
-        .withExec(["rustup", "target", "add", "aarch64-apple-darwin"]);
-
-    } else if (platform === "android") {
-      return container
-        .withExec(["apt-get", "install", "-y", "openjdk-17-jdk", "android-sdk"])
-        .withExec(["rustup", "target", "add", "aarch64-linux-android", "armv7-linux-androideabi"]);
-
-    }
 
     return container;
   }
@@ -91,19 +84,12 @@ export class MyceliumBuild {
    * Build the Tauri app for a specific platform
    */
   @func()
-  async buildApp(@argument() platform: string = "linux"): Promise<string> {
-    let buildCommand = "npm install && npm run tauri build";
-    
-    if (platform === "macos") {
-      buildCommand = "npm install && npm run tauri build -- --target aarch64-apple-darwin";
-    } else if (platform === "android") {
-      buildCommand = "npm install && npm run tauri android build";
-    }
-    
-    return this.containerApp(platform)
-      .withExec(["bash", "-c", buildCommand])
+  async buildApp(): Promise<string> {
+    return this.containerApp()
+      .withExec(["bash", "-c", "npm install && npm run tauri build"])
       .stdout();
   }
+
   
 
   /**
