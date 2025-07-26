@@ -1,9 +1,9 @@
-scalaVersion := "2.13.12"
+scalaVersion := "2.13.16"
 name         := "backend"
 organization := "co.mycelium"
 version      := "1.0"
 
-val doobieVersion = "1.0.0-RC5"
+val doobieVersion = "1.0.0-RC6"
 
 libraryDependencies ++= Seq(
   "org.tpolecat"                  %% "doobie-core"           % doobieVersion,

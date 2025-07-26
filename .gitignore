@@ -24,6 +24,8 @@ pnpm-debug.log*
 
 # Scala
 **/.bloop
+**/.metals
+**/.bsp
 
 # Logs, dumps, debug tools
 *.dump

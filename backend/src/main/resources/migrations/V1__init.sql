@@ -21,10 +21,10 @@ create table station_log (
 create table station_measurements (
     station_id UUID NOT NULL REFERENCES stations (id) ON DELETE CASCADE,
     occurred_on TIMESTAMPTZ NOT NULL,
-    battery_voltage decimal NOT NULL,
-    temperature decimal NOT NULL,
-    humidity decimal NOT NULL,
-    lux decimal NOT NULL,
-    soil_pf decimal NOT NULL,
-    tank_pf decimal NOT NULL
+    battery_voltage decimal(5,2) NOT NULL,
+    temperature decimal(5,2) NOT NULL,
+    humidity decimal(5,2) NOT NULL,
+    lux decimal(5,2) NOT NULL,
+    soil_pf decimal(5,2) NOT NULL,
+    tank_pf decimal(5,2) NOT NULL
 );
