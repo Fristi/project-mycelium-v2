@@ -46,6 +46,42 @@ export class MyceliumBuild {
   }
 
   /**
+   * Container for building the Scala backend
+   */
+  containerBackend(): Container {
+    const src = this.source;
+
+    return dag
+      .container()
+      .from("sbtscala/scala-sbt:eclipse-temurin-alpine-21.0.7_6_1.11.3_2.13.16")
+      .withMountedCache("/root/.sbt", dag.cacheVolume("sbt-cache"))
+      .withMountedCache("/root/.ivy2", dag.cacheVolume("ivy2-cache"))
+      .withMountedCache("/root/.cache", dag.cacheVolume("scala-cache"))
+      .withDirectory("/workspace", src)
+      .withWorkdir("/workspace/backend");
+  }
+
+  /**
+   * Build the Scala backend
+   */
+  @func()
+  async buildBackend(): Promise<string> {
+    return this.containerBackend()
+      .withExec(["sbt", "compile"])
+      .stdout();
+  }
+
+  /**
+   * Test the Scala backend
+   */
+  @func()
+  async testBackend(): Promise<string> {
+    return this.containerBackend()
+      .withExec(["sbt", "test"])
+      .stdout();
+  }
+
+  /**
    * Container for building the Tauri app
    */
   containerApp(): Container {
@@ -89,8 +125,6 @@ export class MyceliumBuild {
       .withExec(["bash", "-c", "npm install && npm run tauri build"])
       .stdout();
   }
-
-  
 
   /**
    * Container for building the central component with dbus support
@@ -150,7 +184,6 @@ export class MyceliumBuild {
     return this.containerPeripheral(arch)
       .withExec(["bash", "-c", `source /root/export-esp.sh && ${command}`]);
   }
-  
 
   /**
    * Build the central component
@@ -183,6 +216,8 @@ export class MyceliumBuild {
     await Promise.all([
       this.buildPeripheral(arch),
       this.testCentral(),
+      this.buildBackend(),
+      this.testBackend(),
       this.buildApp()
     ]);
 

@@ -21,6 +21,12 @@ pnpm-debug.log*
 **/.sqlx
 **/.env
 
+
+# Scala
+**/.bloop
+**/.metals
+**/.bsp
+
 # Logs, dumps, debug tools
 *.dump
 *.out
