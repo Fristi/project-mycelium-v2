@@ -16,7 +16,7 @@ libraryDependencies ++= Seq(
   "org.http4s"                    %% "http4s-ember-server"   % "0.23.25",
   "com.softwaremill.sttp.tapir"   %% "tapir-http4s-server"   % "1.9.10",
   "com.softwaremill.sttp.tapir"   %% "tapir-json-circe"      % "1.9.10",
-  "org.flywaydb"                   % "flyway-core"           % "10.8.1",
+  "org.flywaydb"                   % "flyway-core"           % "11.10.4",
   "io.circe"                      %% "circe-generic-extras"  % "0.14.3",
   "ch.qos.logback"                 % "logback-classic"       % "1.5.0",
   "com.github.jwt-scala"          %% "jwt-core"              % "10.0.0",
@@ -26,7 +26,7 @@ libraryDependencies ++= Seq(
   "is.cir"                        %% "ciris"                 % "3.5.0",
   "com.github.cb372"              %% "cats-retry"            % "3.1.0",
   "io.sentry"                      % "sentry-logback"        % "7.4.0",
-  "org.postgresql"                 % "postgresql"            % "42.7.2",
+  "org.postgresql"                 % "postgresql"            % "42.7.7",
   "com.softwaremill.sttp.tapir"   %% "tapir-openapi-docs"    % "1.9.10",
   "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml"    % "0.7.4"
 )
