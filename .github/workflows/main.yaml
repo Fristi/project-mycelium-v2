@@ -22,7 +22,7 @@ jobs:
           version: "latest"
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           verb: call
-          args: publish-backend markdj ${{ github.ref_name }}
+          args: publish-backend --username markdj --tag ${{ github.ref_name }}
 
   update-manifest:
     name: Update ArgoCD Manifest
