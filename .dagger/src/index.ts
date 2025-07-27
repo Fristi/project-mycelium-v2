@@ -1,11 +1,14 @@
 import {
   argument,
   Container,
+  File,
   dag,
   Directory,
   func,
   object,
+  Secret,
 } from "@dagger.io/dagger";
+
 
 @object()
 export class MyceliumBuild {
@@ -56,9 +59,26 @@ export class MyceliumBuild {
       .from("sbtscala/scala-sbt:eclipse-temurin-alpine-21.0.7_6_1.11.3_2.13.16")
       .withMountedCache("/root/.sbt", dag.cacheVolume("sbt-cache"))
       .withMountedCache("/root/.ivy2", dag.cacheVolume("ivy2-cache"))
-      .withMountedCache("/root/.cache", dag.cacheVolume("scala-cache"))
+      .withMountedCache("/root/.cache/coursier", dag.cacheVolume("scala-coursier-cache"))
       .withDirectory("/workspace", src)
       .withWorkdir("/workspace/backend");
+  }
+
+  @func()
+  publishBackend(username: string, tag?: string): Promise<string> {
+    const builder = this.containerBackend().withExec(["sbt", "assembly"]);
+
+    const image = dag
+      .container()
+      .from("eclipse-temurin:17.0.7_7-jre")
+      .withFile("backend-assembly-1.0.jar", builder.file("target/scala-2.13/backend-assembly-1.0.jar"))
+      .withEntrypoint(["java","-cp","backend-assembly-1.0.jar","co.mycelium.Main"]);
+
+    const final_tag = tag ?? "latest";
+    const addr = image
+      .publish(`${username}/mycelium-backend:${final_tag}`);
+
+    return addr;
   }
 
   /**
@@ -69,6 +89,23 @@ export class MyceliumBuild {
     return this.containerBackend()
       .withExec(["sbt", "compile"])
       .stdout();
+  }
+
+  @func()
+  createClient(generator: string): Directory {
+  
+    const openapi = this.containerBackend().withExec(["sbt", 'runMain co.mycelium.OpenApiGenerator']).file("openapi.json");
+    const generated = dag.container().from("openapitools/openapi-generator-cli:v7.14.0")
+      .withFile("/tmp/openapi.json", openapi)
+      .withExec(["mkdir", "-p", "/out"])
+      .withExec([
+        "/usr/local/bin/docker-entrypoint.sh", "generate",
+          "-i", "/tmp/openapi.json",     // input file
+          "-g", generator,                
+          "-o", "/out"             // output directory inside container
+      ]);
+
+    return generated.directory("/out");
   }
 
   /**
@@ -145,7 +182,8 @@ export class MyceliumBuild {
         "dbus",
         "pkg-config",
       ])
-      .withMountedCache("/root/.cargo", dag.cacheVolume("cargo-edge-central"))
+      .withMountedCache("/root/.cargo/registry", dag.cacheVolume("cargo-edge-central-registry"))
+      .withMountedCache("/root/.cargo/git", dag.cacheVolume("cargo-edge-central-git"))
       .withDirectory("/workspace", src)
       .withWorkdir("/workspace/edge-central");
   }
