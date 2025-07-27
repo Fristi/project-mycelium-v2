@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  repository: markdj/mycelium-backend
+  pullPolicy: IfNotPresent
+  # tag is loaded from image-tag.yaml file
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+
+# Gateway API configuration for Cloudflare
+gateway:
+  enabled: false
+  gatewayClassName: "cloudflare"
+  hostname: "mycelium.markdejong.org"
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Application configuration
+config:
+  # PostgreSQL Database Configuration
+  database:
+    host: "timescale-service"
+    port: 5432
+    username: "postgres"
+    database: "timescale"
+  
+  # S3-compatible Blob Storage Configuration
+  s3:
+    host: "https://ams3.digitaloceanspaces.com"
+    accessKey: "DO801KXWT9YNX3WVJCXV"
+
+secrets:
+  create: false
+  databaseSecret: "mycelium-database-secret"
+  s3Secret: "mycelium-s3-secret"
