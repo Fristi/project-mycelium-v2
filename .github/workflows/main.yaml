@@ -1,0 +1,52 @@
+name: "Release backend"
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  publish:
+    name: Dagger publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: markdj
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Dagger CI
+        uses: dagger/dagger-for-github@8.0.0
+        with:
+          version: "latest"
+          cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+          verb: call
+          args: publish-backend markdj ${{ github.ref_name }}
+
+  update-manifest:
+    name: Update ArgoCD Manifest
+    runs-on: ubuntu-latest
+    needs: publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update manifest file
+        run: |
+          cat > backend/deployment/image-tag.yaml << EOF
+          imageTag: "${{ github.ref_name }}"
+          EOF
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update backend image tag to ${{ github.ref_name }}"
+          title: "Update backend image tag to ${{ github.ref_name }}"
+          body: |
+            This PR updates the backend image tag to `${{ github.ref_name }}`.
+            
+            Once merged, ArgoCD will pick up this change and deploy the new version.
+          branch: update-backend-${{ github.ref_name }}
+          delete-branch: true
