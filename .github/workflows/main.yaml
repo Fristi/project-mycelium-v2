@@ -1,8 +1,8 @@
 name: "Release backend"
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - main
 
 jobs:
   publish:
@@ -22,7 +22,7 @@ jobs:
           version: "latest"
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           verb: call
-          args: publish-backend --username markdj --tag ${{ github.ref_name }}
+          args: publish-backend --username markdj --tag dev-${{ github.sha }}
 
   update-manifest:
     name: Update ArgoCD Manifest
@@ -36,17 +36,17 @@ jobs:
       - name: Update manifest file
         run: |
           cat > backend/deployment/image-tag.yaml << EOF
-          imageTag: "${{ github.ref_name }}"
+          imageTag: "dev-${{ github.sha }}"
           EOF
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Update backend image tag to ${{ github.ref_name }}"
-          title: "Update backend image tag to ${{ github.ref_name }}"
+          commit-message: "Update backend image tag to dev-${{ github.sha }}"
+          title: "Update backend image tag to dev-${{ github.sha }}"
           body: |
-            This PR updates the backend image tag to `${{ github.ref_name }}`.
+            This PR updates the backend image tag to `dev-${{ github.sha }}`.
             
             Once merged, ArgoCD will pick up this change and deploy the new version.
-          branch: update-backend-${{ github.ref_name }}
+          branch: update-backend-dev-${{ github.sha }}
           delete-branch: true
