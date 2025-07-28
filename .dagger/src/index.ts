@@ -189,7 +189,6 @@ export class MyceliumBuild {
         "sh", "-c",
         "apt-get update && apt-get install -y gcc build-essential curl pkg-config"
       ])
-      .terminal()
       .withMountedCache("/root", dag.cacheVolume("edge-peripheral-root"))
       .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("edge-peripheral-cargo-registry"))
       .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("edge-peripheral-cargo-git"))
