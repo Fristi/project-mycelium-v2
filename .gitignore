@@ -56,8 +56,6 @@ metals.sbt
 *.bak
 *.old
 
-# macOS
-Icon?
 
 # Windows
 Thumbs.db
