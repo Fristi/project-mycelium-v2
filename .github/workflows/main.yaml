@@ -24,7 +24,7 @@ jobs:
           version: "latest"
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
           verb: call
-          args: publish-backend --username markdj --tag dev-${{ github.sha }}
+          args: publish-backend --password env://DOCKERHUB_TOKEN --tag dev-${{ github.sha }}
 
   update-manifest:
     name: Update ArgoCD Manifest

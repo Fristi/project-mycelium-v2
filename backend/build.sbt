@@ -38,8 +38,13 @@ Compile / scalacOptions ++= {
   }
 }
 
-assembly / assemblyMergeStrategy := {
-  case PathList("META-INF", entry) if entry.startsWith("services") => MergeStrategy.concat
-  case PathList("META-INF", _)                                     => MergeStrategy.discard
-  case _                                                           => MergeStrategy.first
-}
+mainClass := Some("co.mycelium.Main")
+
+val tag = sys.props.getOrElse("imageTag", "latest")
+
+jibBaseImage := "gcr.io/distroless/java17-debian11"
+jibImageFormat := JibImageFormat.Docker
+jibPlatforms := Set(JibPlatforms.amd64, JibPlatforms.arm64)
+jibVersion := tag
+jibName := "mycelium-backend"
+jibOrganization := "markdj"

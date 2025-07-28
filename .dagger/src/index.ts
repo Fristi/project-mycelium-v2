@@ -65,20 +65,13 @@ export class MyceliumBuild {
   }
 
   @func()
-  publishBackend(username: string, tag?: string): Promise<string> {
-    const builder = this.containerBackend().withExec(["sbt", "assembly"]);
-
-    const image = dag
-      .container()
-      .from("eclipse-temurin:17.0.7_7-jre")
-      .withFile("backend-assembly-1.0.jar", builder.file("target/scala-2.13/backend-assembly-1.0.jar"))
-      .withEntrypoint(["java","-cp","backend-assembly-1.0.jar","co.mycelium.Main"]);
-
-    const final_tag = tag ?? "latest";
-    const addr = image
-      .publish(`${username}/mycelium-backend:${final_tag}`);
-
-    return addr;
+  publishBackend(password: Secret, tag?: string): Promise<string> {
+    return this
+      .containerBackend()
+      .withEnvVariable("JIB_TARGET_IMAGE_USERNAME", "markdj")
+      .withSecretVariable("JIB_TARGET_IMAGE_PASSWORD", password)
+      .withExec(["sbt", `-DimageTag=${tag ?? "latest"}`, "jibImageBuild"])
+      .stdout();
   }
 
   /**
