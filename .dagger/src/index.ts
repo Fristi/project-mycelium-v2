@@ -60,8 +60,8 @@ export class MyceliumBuild {
       .withMountedCache("/root/.sbt", dag.cacheVolume("sbt-cache"))
       .withMountedCache("/root/.ivy2", dag.cacheVolume("ivy2-cache"))
       .withMountedCache("/root/.cache/coursier", dag.cacheVolume("scala-coursier-cache"))
-      .withDirectory("/workspace", src)
-      .withWorkdir("/workspace/backend");
+      .withDirectory("/workspace", src.directory("backend").filter({ include: ["project/build.properties", "project/plugins.sbt", "src/**", ".sbtopts", ".scalafmt.conf", "build.sbt"]}))
+      .withWorkdir("/workspace");
   }
 
   @func()
@@ -126,29 +126,21 @@ export class MyceliumBuild {
 
     let container = dag
       .container()
-      .from("rust:1.88-bookworm")
-      .withExec(["apt-get", "install", "-y", "curl", "ca-certificates", "gnupg"])
-      .withExec(["bash", "-c", "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"])
-      .withExec(["apt-get", "update"])      
+      .from("rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0")
+      .withExec(["sh", "-c", "echo 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20240701T000000Z bookworm main' > /etc/apt/sources.list"])
+      .withExec(["sh", "-c", "apt-get install -y curl=7.88.1-10+deb12u12 ca-certificates=20230311+deb12u1 gnupg=2.2.40-1.1"])
+      .withExec(["sh", "-c", "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"])
       .withExec([
-        "apt-get",
-        "install",
-        "-y",
-        "libwebkit2gtk-4.1-dev",
-        "build-essential",
-        "wget",
-        "file",
-        "libxdo-dev",
-        "libssl-dev",
-        "libayatana-appindicator3-dev",
-        "librsvg2-dev",
-        "xdg-utils",
-        "nodejs"
+        "sh", "-c",
+        "apt-get update && apt-get install -y libwebkit2gtk-4.1-dev=2.48.3-1~deb12u1 build-essential=12.9 wget=1.21.3-1+deb12u1 file=1:5.44-3 libxdo-dev=1:3.20160805.1-5 libssl-dev=3.0.16-1~deb12u1 libayatana-appindicator3-dev=0.5.92-1 librsvg2-dev=2.54.7+dfsg-1~deb12u1 xdg-utils=1.1.3-4.1 nodejs=20.19.4-1nodesource1"
       ])
-      .withMountedCache("/root/.cargo", dag.cacheVolume("cargo-tauri"))
-      .withMountedCache("/root/.npm", dag.cacheVolume("npm-tauri"))
-      .withDirectory("/workspace", src)
-      .withWorkdir("/workspace/app");
+      .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("app-cargo-registry"))
+      .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("app-cargo-git"))
+      .withMountedCache("/root/.npm", dag.cacheVolume("app-npm"))
+      .withMountedCache("/workspace/node_modules", dag.cacheVolume("app-node-modules"))
+      .withMountedCache("/workspace/src-tauri/target", dag.cacheVolume("app-tauri-target"))
+      .withDirectory("/workspace", src.directory("app").filter({include: ["public/**", "src/**", "src-tauri/capabilities/**", "src-tauri/icons/**", "src-tauri/src/**", "src-tauri/build.rs", "src-tauri/Cargo.toml", "src-tauri/Cargo.lock", "src-tauri/tauri.conf.json", "index.html", "package-lock.json", "package.json", "postcss.config.js", "tailwind.config.js", "tsconfig.json", "tsconfig.node.json", "vite.config.ts"]}))
+      .withWorkdir("/workspace");
 
     return container;
   }
@@ -171,20 +163,16 @@ export class MyceliumBuild {
 
     return dag
       .container()
-      .from("rust:1.88-bookworm")
-      .withExec(["apt-get", "update"])
-      .withExec([
-        "apt-get",
-        "install",
-        "-y",
-        "libdbus-1-3",
-        "libdbus-1-dev",
-        "dbus",
-        "pkg-config",
-      ])
-      .withMountedCache("/root/.cargo/registry", dag.cacheVolume("cargo-edge-central-registry"))
-      .withMountedCache("/root/.cargo/git", dag.cacheVolume("cargo-edge-central-git"))
-      .withDirectory("/workspace", src)
+      .from("rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0")
+      .withExec(["sh", "-c", "echo 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20240701T000000Z bookworm main' > /etc/apt/sources.list"])
+      .withExec(["sh", "-c", "apt-get update && apt-get install -y libdbus-1-3=1.14.10-1~deb12u1 libdbus-1-dev=1.14.10-1~deb12u1 dbus=1.14.10-1~deb12u1 pkg-config=1.8.1-1"])
+      .withMountedCache("/root", dag.cacheVolume("edge-central-root"))
+      .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("edge-central-cargo-registry"))
+      .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("edge-central-cargo-git"))
+      .withMountedCache("/workspace/edge-central/target", dag.cacheVolume("edge-central-target"))
+      .withMountedCache("/workspace/edge-protocol/target", dag.cacheVolume("edge-protocol-target"))
+      .withDirectory("/workspace/edge-central", src.directory("edge-central").filter({include: ["src/**", "migrations/**", "Cargo.toml", "Cargo.lock"]}))
+      .withDirectory("/workspace/edge-protocol", src.directory("edge-protocol").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
       .withWorkdir("/workspace/edge-central");
   }
 
@@ -196,22 +184,20 @@ export class MyceliumBuild {
 
     return dag
       .container({ platform: arch as any })
-      .from("rust:1.88-bookworm")
-      .withExec(["apt-get", "update"])
+      .from("rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0")
       .withExec([
-        "apt-get",
-        "install",
-        "-y",
-        "gcc",
-        "build-essential",
-        "curl",
-        "pkg-config",
+        "sh", "-c",
+        "apt-get update && apt-get install -y gcc build-essential curl pkg-config"
       ])
-      .withMountedCache("/root", dag.cacheVolume("root-edge-peripheral"))
-      .withMountedCache("/usr/local/rustup/toolchains/esp", dag.cacheVolume("firmware-rustup-esp-toolchain"))
-      .withExec(["bash", "-c", "cargo install espup --locked"])
-      .withExec(["bash", "-c", "espup install"])
-      .withDirectory("/workspace", src)
+      .withMountedCache("/root", dag.cacheVolume("edge-peripheral-root"))
+      .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("edge-peripheral-cargo-registry"))
+      .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("edge-peripheral-cargo-git"))
+      .withMountedCache("/usr/local/rustup/toolchains/esp", dag.cacheVolume("edge-peripheral-rustup-toolchain-esp"))
+      .withMountedCache("/workspace/edge-peripheral/target", dag.cacheVolume("edge-peripheral-target-folder"))
+      .withExec(["sh", "-c", "cargo install espup --locked --version 0.15.1"])
+      .withExec(["sh", "-c", "espup install -t esp32"])
+      .withDirectory("/workspace/edge-peripheral", src.directory("edge-peripheral").filter({include: [".cargo/config.toml", "src/**", "build.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "template.yaml"]}))
+      .withDirectory("/workspace/edge-protocol", src.directory("edge-protocol").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
       .withWorkdir("/workspace/edge-peripheral")
   }
 

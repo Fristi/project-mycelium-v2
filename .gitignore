@@ -25,6 +25,8 @@ pnpm-debug.log*
 **/.bloop
 **/.metals
 **/.bsp
+**/data
+metals.sbt
 
 # Logs, dumps, debug tools
 *.dump
@@ -53,8 +55,6 @@ pnpm-debug.log*
 *.bak
 *.old
 
-# macOS
-Icon?
 
 # Windows
 Thumbs.db
