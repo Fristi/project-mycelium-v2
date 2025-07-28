@@ -22,7 +22,8 @@ service:
 # Gateway API configuration for Cloudflare
 gateway:
   enabled: true
-  gatewayClassName: "cloudflare"
+  gatewayClassName: "gateway"
+  gatewayNamespace: "cloudflare-gateway"
   hostname: "mycelium.markdejong.org"
 
 resources: {}
