@@ -28,21 +28,25 @@ object DoobieStationRepository extends StationRepository[ConnectionIO] {
   def insert(station: Station, on: Instant): ConnectionIO[UUID] = {
 
     def insertIntoStations =
-      sql"INSERT INTO stations (id, mac_addr, name, location, description, user_id, watering_schedule, created) VALUES (${station.id}, ${station.mac}, ${station.name}, ${station.location}, ${station.description}, ${station.userId}, ${station.wateringSchedule}, $on) on conflict on constraint unique_mac do update set updated = now(), name = excluded.name, description = excluded.description, location = excluded.location, user_id = excluded.user_id, watering_schedule = excluded.watering_schedule returning id".query[UUID]
+      sql"""INSERT INTO stations (id, mac_addr, name, location, description, user_id, created) 
+            VALUES (${station.id}, ${station.mac}, ${station.name}, ${station.location}, ${station.description}, ${station.userId}, $on) 
+            on conflict on constraint unique_mac 
+            do update set 
+            updated = now(), 
+            user_id = excluded.user_id 
+            returning id
+      """.query[UUID]
 
-    for {
-      id <- insertIntoStations.unique
-      _ <- DoobieStationLogRepository.insert(StationLog(id, on, StationEvent.ScheduleChanged(station.wateringSchedule)))
-    } yield id
+    insertIntoStations.unique
   }
 
   def listByUserId(userId: String): ConnectionIO[List[Station]] =
-    sql"SELECT id, mac_addr, name, location, description, watering_schedule, user_id, created, updated FROM stations where user_id = $userId"
+    sql"SELECT id, mac_addr, name, location, description, user_id, created, updated FROM stations where user_id = $userId"
       .query[Station]
       .to[List]
 
   def findById(id: UUID, userId: String): ConnectionIO[Option[Station]] =
-    sql"SELECT id, mac_addr, name, location, description, watering_schedule, user_id, created, updated FROM stations WHERE id = $id AND user_id = $userId"
+    sql"SELECT id, mac_addr, name, location, description, user_id, created, updated FROM stations WHERE id = $id AND user_id = $userId"
       .query[Station]
       .option
 
@@ -60,8 +64,7 @@ object DoobieStationRepository extends StationRepository[ConnectionIO] {
       val updates = List(
         update.name.map(n => fr"name = $n"),
         update.location.map(n => fr"location = $n"),
-        update.description.map(n => fr"description = $n"),
-        update.waterSchedule.map(n => fr"watering_schedule = $n")
+        update.description.map(n => fr"description = $n")
       )
 
       NonEmptyList.fromList(updates.flatten) match {
@@ -72,14 +75,6 @@ object DoobieStationRepository extends StationRepository[ConnectionIO] {
       }
     }
 
-    val eventUpdate = update.waterSchedule match {
-      case Some(schedule) =>
-        DoobieStationLogRepository.insert(
-          StationLog(id, now, StationEvent.ScheduleChanged(schedule))
-        )
-      case None => Applicative[ConnectionIO].pure(0)
-    }
-
-    updateAttributes <* eventUpdate
+    updateAttributes
   }
 }

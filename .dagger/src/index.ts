@@ -85,7 +85,7 @@ export class MyceliumBuild {
   }
 
   @func()
-  createClient(generator: string): Directory {
+  createClient(generator: string, name: string): Directory {
   
     const openapi = this.containerBackend().withExec(["sbt", 'runMain co.mycelium.OpenApiGenerator']).file("openapi.json");
     const generated = dag.container().from("openapitools/openapi-generator-cli:v7.14.0")
@@ -94,7 +94,8 @@ export class MyceliumBuild {
       .withExec([
         "/usr/local/bin/docker-entrypoint.sh", "generate",
           "-i", "/tmp/openapi.json",     // input file
-          "-g", generator,                
+          "-g", generator,
+          `--additional-properties=packageName=${name},supportMiddleware=true`,
           "-o", "/out"             // output directory inside container
       ]);
 

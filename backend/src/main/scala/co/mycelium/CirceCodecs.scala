@@ -8,8 +8,7 @@ import co.mycelium.domain.{
   StationLog,
   StationMeasurement,
   StationUpdate,
-  Watering,
-  WateringSchedule
+  Watering
 }
 import cron4s.{Cron, CronExpr}
 import io.circe.generic.extras.Configuration
@@ -37,7 +36,6 @@ object CirceCodecs {
       .from(Decoder.decodeString, Encoder.encodeString)
       .iemap(s => Cron.parse(s).left.map(_.getMessage))(_.toString)
 
-  implicit val codecWateringSchedule: Codec[WateringSchedule] = deriveConfiguredCodec
   implicit val codecStationEvent: Codec[StationEvent]         = deriveConfiguredCodec
   implicit val codecStationLog: Codec[StationLog]             = deriveCodec
   implicit val codecStationReading: Codec[StationMeasurement] = deriveCodec

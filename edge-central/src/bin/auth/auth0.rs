@@ -62,19 +62,6 @@ where
     Ok(res)
 }
 
-pub async fn refresh_token(cfg: &Auth0Config, refresh_token: &str) -> anyhow::Result<TokenResult> {
-    post_form(
-        &format!("https://{}/oauth/token", &cfg.domain),
-        [
-            ("client_id", &cfg.client_id),
-            ("client_secret", &cfg.client_secret),
-            ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token),
-        ],
-    )
-    .await
-}
-
 pub async fn poll_token(cfg: &Auth0Config, device_code: &str) -> anyhow::Result<TokenResult> {
     post_form(
         &format!("https://{}/oauth/token", &cfg.domain),

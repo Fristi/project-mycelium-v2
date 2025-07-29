@@ -19,7 +19,6 @@ pub enum PeripheralSyncMode {
 pub struct Auth0Config {
     pub domain: String,
     pub client_id: String,
-    pub client_secret: String,
     pub scope: String,
     pub audience: String,
 }
@@ -32,6 +31,7 @@ pub struct WifiConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
+    pub backend_url: String,
     pub database_url: String,
     pub onboarding_strategy: OnboardingStrategy,
     pub peripheral_sync_mode: PeripheralSyncMode,
@@ -66,12 +66,12 @@ mod tests {
     #[serial]
     fn test_from_env() {
         // Set environment variables for testing
+        env::set_var("APP.BACKEND_URL", "http://localhost:8080/api");
         env::set_var("APP.DATABASE_URL", "postgres://localhost/test");
         env::set_var("APP.ONBOARDING_STRATEGY", "ble");
         env::set_var("APP.PERIPHERAL_SYNC_MODE", "random");
         env::set_var("APP.AUTH0.DOMAIN", "test.auth0.com");
         env::set_var("APP.AUTH0.CLIENT_ID", "test-client-id");
-        env::set_var("APP.AUTH0.CLIENT_SECRET", "test-client-secret");
         env::set_var("APP.AUTH0.SCOPE", "openid profile");
         env::set_var("APP.AUTH0.AUDIENCE", "test-audience");
         env::set_var("APP.WIFI.SSID", "test-wifi");
@@ -92,19 +92,18 @@ mod tests {
         }
         assert_eq!(config.auth0.domain, "test.auth0.com");
         assert_eq!(config.auth0.client_id, "test-client-id");
-        assert_eq!(config.auth0.client_secret, "test-client-secret");
         assert_eq!(config.auth0.scope, "openid profile");
         assert_eq!(config.auth0.audience, "test-audience");
         assert_eq!(config.wifi.ssid, "test-wifi");
         assert_eq!(config.wifi.password, "test-password");
 
         // Clean up environment variables
+        env::remove_var("APP.BACKEND_URL");
         env::remove_var("APP.DATABASE_URL");
         env::remove_var("APP.ONBOARDING_STRATEGY");
         env::remove_var("APP.PERIPHERAL_SYNC_MODE");
         env::remove_var("APP.AUTH0.DOMAIN");
         env::remove_var("APP.AUTH0.CLIENT_ID");
-        env::remove_var("APP.AUTH0.CLIENT_SECRET");
         env::remove_var("APP.AUTH0.SCOPE");
         env::remove_var("APP.AUTH0.AUDIENCE");
         env::remove_var("APP.WIFI.SSID");
@@ -115,12 +114,12 @@ mod tests {
     #[serial]
     fn test_from_env_with_different_values() {
         // Set environment variables for testing
+        env::set_var("APP.BACKEND_URL", "http://localhost:8080/api");
         env::set_var("APP.DATABASE_URL", "mysql://localhost/test");
         env::set_var("APP.ONBOARDING_STRATEGY", "local");
         env::set_var("APP.PERIPHERAL_SYNC_MODE", "ble");
         env::set_var("APP.AUTH0.DOMAIN", "other.auth0.com");
         env::set_var("APP.AUTH0.CLIENT_ID", "other-client-id");
-        env::set_var("APP.AUTH0.CLIENT_SECRET", "other-client-secret");
         env::set_var("APP.AUTH0.SCOPE", "email");
         env::set_var("APP.AUTH0.AUDIENCE", "other-audience");
         env::set_var("APP.WIFI.SSID", "other-wifi");
@@ -141,19 +140,18 @@ mod tests {
         }
         assert_eq!(config.auth0.domain, "other.auth0.com");
         assert_eq!(config.auth0.client_id, "other-client-id");
-        assert_eq!(config.auth0.client_secret, "other-client-secret");
         assert_eq!(config.auth0.scope, "email");
         assert_eq!(config.auth0.audience, "other-audience");
         assert_eq!(config.wifi.ssid, "other-wifi");
         assert_eq!(config.wifi.password, "other-password");
 
         // Clean up environment variables
+        env::remove_var("APP.BACKEND_URL");
         env::remove_var("APP.DATABASE_URL");
         env::remove_var("APP.ONBOARDING_STRATEGY");
         env::remove_var("APP.PERIPHERAL_SYNC_MODE");
         env::remove_var("APP.AUTH0.DOMAIN");
         env::remove_var("APP.AUTH0.CLIENT_ID");
-        env::remove_var("APP.AUTH0.CLIENT_SECRET");
         env::remove_var("APP.AUTH0.SCOPE");
         env::remove_var("APP.AUTH0.AUDIENCE");
     }
@@ -162,12 +160,12 @@ mod tests {
     #[serial]
     fn test_from_env_missing_values() {
         // Clear relevant environment variables
+        env::remove_var("APP.BACKEND_URL");
         env::remove_var("APP.DATABASE_URL");
         env::remove_var("APP.ONBOARDING_STRATEGY");
         env::remove_var("APP.PERIPHERAL_SYNC_MODE");
         env::remove_var("APP.AUTH0.DOMAIN");
         env::remove_var("APP.AUTH0.CLIENT_ID");
-        env::remove_var("APP.AUTH0.CLIENT_SECRET");
         env::remove_var("APP.AUTH0.SCOPE");
         env::remove_var("APP.AUTH0.AUDIENCE");
 
