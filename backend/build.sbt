@@ -3,13 +3,14 @@ name         := "backend"
 organization := "co.mycelium"
 version      := "1.0"
 
-val doobieVersion = "1.0.0-RC6"
+val doobieVersion = "1.0.0-RC9"
 
 libraryDependencies ++= Seq(
   "org.tpolecat"                  %% "doobie-core"           % doobieVersion,
   "org.tpolecat"                  %% "doobie-postgres"       % doobieVersion,
   "org.tpolecat"                  %% "doobie-hikari"         % doobieVersion,
   "org.tpolecat"                  %% "doobie-postgres-circe" % doobieVersion,
+  "org.tpolecat"                  %% "doobie-weaver" % doobieVersion % Test,
   "org.typelevel"                 %% "cats-tagless-macros"   % "0.15.0",
   "com.github.alonsodomin.cron4s" %% "cron4s-core"           % "0.7.0",
   "org.http4s"                    %% "http4s-dsl"            % "0.23.25",

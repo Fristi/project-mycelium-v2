@@ -8,6 +8,7 @@ yarn-error.log*
 pnpm-debug.log*
 .DS_Store
 
+
 # Rust
 **/target/
 **/*.rs.bk   # Common editor backups
@@ -20,6 +21,8 @@ pnpm-debug.log*
 **/.sqlx
 **/.env
 
+# Generated
+edge-client-backend
 
 # Scala
 **/.bloop

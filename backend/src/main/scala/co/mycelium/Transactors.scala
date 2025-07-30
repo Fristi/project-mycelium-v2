@@ -27,7 +27,9 @@ object Transactors {
     def policy[F[_]: Applicative] =
       limitRetries[F](10) join exponentialBackoff[F](200.milliseconds)
 
-    def handleError(error: Throwable, retryDetails: RetryDetails): Resource[F, Unit] = Resource.unit
+    def handleError(error: Throwable, retryDetails: RetryDetails): Resource[F, Unit] = {
+      Resource.eval(Async[F].blocking(error.printStackTrace()))
+    }
 
     val config = new HikariConfig()
     config.setPoolName("mycelium")

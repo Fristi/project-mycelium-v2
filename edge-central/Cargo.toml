@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 edge-protocol = { path = "../edge-protocol" }
+edge-client-backend = { path = "../edge-client-backend" }
 btleplug = "0.11.8"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1.17"
@@ -19,9 +20,16 @@ wifi-rs = "0.2.4"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 reqwest = { version = "0.12", features = ["json"] }
+reqwest-middleware = "0.4.2"
 config = "0.14"
 dotenv = "0.15.0"
 async-trait = "0.1.88"
+aliri_reqwest = "0.5.1"
+aliri_tokens = "0.3.2"
+aliri_braid = "0.4.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+predicates-core = "1.0.9"
 
 [dev-dependencies]
 serial_test = "3.2.0"

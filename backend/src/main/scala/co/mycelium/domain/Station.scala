@@ -7,9 +7,8 @@ final case class Station(
     id: UUID,
     mac: String,
     name: String,
-    location: String,
-    description: String,
-    wateringSchedule: WateringSchedule,
+    location: Option[String],
+    description: Option[String],
     userId: String,
     created: Instant,
     updated: Option[Instant]

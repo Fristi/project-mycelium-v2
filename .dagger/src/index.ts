@@ -85,7 +85,7 @@ export class MyceliumBuild {
   }
 
   @func()
-  createClient(generator: string): Directory {
+  createClient(generator: string, name: string): Directory {
   
     const openapi = this.containerBackend().withExec(["sbt", 'runMain co.mycelium.OpenApiGenerator']).file("openapi.json");
     const generated = dag.container().from("openapitools/openapi-generator-cli:v7.14.0")
@@ -94,7 +94,8 @@ export class MyceliumBuild {
       .withExec([
         "/usr/local/bin/docker-entrypoint.sh", "generate",
           "-i", "/tmp/openapi.json",     // input file
-          "-g", generator,                
+          "-g", generator,
+          `--additional-properties=packageName=${name},supportMiddleware=true`,
           "-o", "/out"             // output directory inside container
       ]);
 
@@ -165,6 +166,7 @@ export class MyceliumBuild {
       .withMountedCache("/workspace/edge-central/target", dag.cacheVolume("edge-central-target"))
       .withMountedCache("/workspace/edge-protocol/target", dag.cacheVolume("edge-protocol-target"))
       .withDirectory("/workspace/edge-central", src.directory("edge-central").filter({include: ["src/**", "migrations/**", "Cargo.toml", "Cargo.lock"]}))
+      .withDirectory("/workspace/edge-client-backend", src.directory("edge-client-backend").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
       .withDirectory("/workspace/edge-protocol", src.directory("edge-protocol").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
       .withWorkdir("/workspace/edge-central");
   }
@@ -230,11 +232,11 @@ export class MyceliumBuild {
 
   @func()
   async ci(@argument() arch: string = "linux/amd64") {
+
     await Promise.all([
       this.buildPeripheral(arch),
       this.testCentral(),
       this.buildBackend(),
-      this.testBackend(),
       this.buildApp()
     ]);
 

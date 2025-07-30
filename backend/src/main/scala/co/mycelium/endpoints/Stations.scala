@@ -22,25 +22,34 @@ object Stations extends TapirSchemas {
   object endpoints {
     val stations = base.in("stations")
 
-    val list = stations.get.out(jsonBody[List[Station]])
-    val add  = stations.post.in(jsonBody[StationInsert]).out(jsonBody[UUID])
+    val list = stations.get.out(jsonBody[List[Station]]).name("listStations")
+    val add  = stations.post.in(jsonBody[StationInsert]).out(jsonBody[UUID]).name("addStation")
     val details = stations.get
       .in(path[UUID]("stationId"))
       .in(query[Option[MeasurementPeriod]]("period"))
+      .name("getStation")
       .out(jsonBody[StationDetails])
-    val update = stations.put.in(path[UUID]("stationId")).in(jsonBody[StationUpdate])
-    val delete = stations.delete.in(path[UUID]("stationId"))
+    val update =
+      stations.put.in(path[UUID]("stationId")).in(jsonBody[StationUpdate]).name("updateStation")
+    val delete = stations.delete.in(path[UUID]("stationId")).name("deleteStation")
     val checkIn = stations
       .in(path[UUID]("stationId"))
       .in("checkin")
       .put
       .in(jsonBody[List[StationMeasurement]])
+      .name("checkinStation")
       .out(jsonBody[Watering])
-    val watered = stations.in(path[UUID]("stationId")).in("watered").post.in(jsonBody[Watering])
+    val watered = stations
+      .in(path[UUID]("stationId"))
+      .in("watered")
+      .post
+      .in(jsonBody[Watering])
+      .name("wateredAtStation")
     val log = stations
       .in(path[UUID]("stationId"))
       .in("log")
       .in(query[Option[Long]]("page"))
+      .name("getStationLog")
       .out(jsonBody[List[StationLog]])
 
     val all = Set(list, add, details, update, delete, checkIn, watered, log)
@@ -67,29 +76,7 @@ object Stations extends TapirSchemas {
         for {
           stationOpt <- repos.stations.findById(id, at.sub)
           _          <- repos.measurements.insertMany(id, measurements)
-          watering <- stationOpt match {
-            case Some(station) =>
-              station.wateringSchedule match {
-                case WateringSchedule.Interval(schedule, period) =>
-                  repos.stationLog.lastTimeWatered(id).flatMap {
-                    case Some(lastTime) =>
-                      schedule.next(lastTime) match {
-                        case Some(nextTime) if Instant.now().isAfter(nextTime) =>
-                          IO(Watering(Some(period)))
-                        case None => IO(Watering(Some(period)))
-                        case _    => IO(Watering(None))
-                      }
-                    case None => IO(Watering(None))
-                  }
-
-                case WateringSchedule.Threshold(belowSoilPf, period) =>
-                  if (measurements.lastOption.exists(_.soilPf < belowSoilPf))
-                    IO(Watering(Some(period)))
-                  else IO(Watering(None))
-              }
-            case None => IO(Watering(None))
-          }
-        } yield Right(watering)
+        } yield Right(Watering(None))
       }
     }
 
@@ -140,9 +127,8 @@ trait TapirSchemas {
   implicit val customConfiguration: Configuration =
     Configuration.default.withDiscriminator("_type")
 
-  implicit val schemaCronExpr: Schema[CronExpr]                 = Schema.string
-  implicit val schemaFiniteDuration: Schema[FiniteDuration]     = Schema.string
-  implicit val schemaWateringSchedule: Schema[WateringSchedule] = Schema.derived
+  implicit val schemaCronExpr: Schema[CronExpr]             = Schema.string
+  implicit val schemaFiniteDuration: Schema[FiniteDuration] = Schema.string
 
   implicit val codecMeasurementPeriod: Codec[String, MeasurementPeriod, CodecFormat.TextPlain] =
     Codec.string.map(
