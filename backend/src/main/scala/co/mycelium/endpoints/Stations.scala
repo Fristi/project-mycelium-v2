@@ -127,9 +127,8 @@ trait TapirSchemas {
   implicit val customConfiguration: Configuration =
     Configuration.default.withDiscriminator("_type")
 
-  implicit val schemaCronExpr: Schema[CronExpr]                 = Schema.string
-  implicit val schemaFiniteDuration: Schema[FiniteDuration]     = Schema.string
-  
+  implicit val schemaCronExpr: Schema[CronExpr]             = Schema.string
+  implicit val schemaFiniteDuration: Schema[FiniteDuration] = Schema.string
 
   implicit val codecMeasurementPeriod: Codec[String, MeasurementPeriod, CodecFormat.TextPlain] =
     Codec.string.map(
