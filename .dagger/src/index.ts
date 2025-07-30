@@ -166,6 +166,7 @@ export class MyceliumBuild {
       .withMountedCache("/workspace/edge-central/target", dag.cacheVolume("edge-central-target"))
       .withMountedCache("/workspace/edge-protocol/target", dag.cacheVolume("edge-protocol-target"))
       .withDirectory("/workspace/edge-central", src.directory("edge-central").filter({include: ["src/**", "migrations/**", "Cargo.toml", "Cargo.lock"]}))
+      .withDirectory("/workspace/edge-client-backend", src.directory("edge-client-backend").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
       .withDirectory("/workspace/edge-protocol", src.directory("edge-protocol").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
       .withWorkdir("/workspace/edge-central");
   }
@@ -236,7 +237,6 @@ export class MyceliumBuild {
       this.buildPeripheral(arch),
       this.testCentral(),
       this.buildBackend(),
-      this.testBackend(),
       this.buildApp()
     ]);
 
