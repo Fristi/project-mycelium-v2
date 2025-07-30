@@ -231,6 +231,7 @@ export class MyceliumBuild {
 
   @func()
   async ci(@argument() arch: string = "linux/amd64") {
+
     await Promise.all([
       this.buildPeripheral(arch),
       this.testCentral(),
