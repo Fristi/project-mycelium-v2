@@ -5,7 +5,7 @@ on:
 jobs:
   dagger:
     name: Dagger Build and Test
-    runs-on: depot-ubuntu-22.04-4,dagger=0.15.2
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
