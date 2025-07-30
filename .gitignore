@@ -21,6 +21,8 @@ pnpm-debug.log*
 **/.sqlx
 **/.env
 
+# Generated
+edge-client-backend
 
 # Scala
 **/.bloop
