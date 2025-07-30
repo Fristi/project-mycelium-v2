@@ -14,14 +14,9 @@ jobs:
         with:
           version: "latest"
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
-          verb: call
-          args:
-            create-client --generator rust --name edge-client-backend \
-            export --path edge-client-backend
-      - name: Dagger CI
-        uses: dagger/dagger-for-github@8.0.0
-        with:
-          version: "latest"
-          cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
-          verb: call
-          args: ci
+      - name: Build clients
+        run: create-client --generator rust --name edge-client-backend | export --path edge-client-backend
+        shell: dagger {0}
+      - name: CI
+        run: ci
+        shell: dagger {0}
