@@ -17,7 +17,7 @@ object Auth {
     implicit val decoder: Decoder[AccessToken] = deriveDecoder
   }
 
-  val jwkProvider = new JwkProviderBuilder("https://dev-plq6-asi.eu.auth0.com")
+  val jwkProvider = new JwkProviderBuilder("https://mycelium-greens.eu.auth0.com")
     .cached(3600, 3600, TimeUnit.SECONDS)
     .build()
 
