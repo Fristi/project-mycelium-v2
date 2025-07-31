@@ -10,10 +10,7 @@ import { PlantList } from "./pages/PlantList.tsx";
 import { PlantEdit } from "./pages/PlantEdit.tsx";
 import { PlantAdd, PlantProvisioning } from "./pages/PlantAdd.tsx";
 
-
-
-const host = import.meta.env.MODE == "production" ? "https://mycelium.fly.dev" : "http://localhost:8080";
-const callbackUri = host;
+const callbackUri = "http://localhost:1420";
 const cacheLocation = "localstorage";
 
 const router = createHashRouter(
@@ -39,8 +36,8 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <Auth0Provider
       domain="mycelium-greens.eu.auth0.com"
       clientId="TTqNjNFpS7J158xPzznXSAMK302F6Amc"
-      // useRefreshTokens={true}
-      // useRefreshTokensFallback={false}
+      useRefreshTokens={true}
+      useRefreshTokensFallback={false}
       cacheLocation={cacheLocation}
       authorizationParams={{
         redirect_uri: callbackUri,

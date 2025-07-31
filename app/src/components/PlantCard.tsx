@@ -1,6 +1,5 @@
 import { Station } from "../api";
 import PlantLocation from "./PlantLocation";
-import PlantWateringSchedule from "./PlantWateringSchedule";
 
 type Props = {
   station: Station;
@@ -25,7 +24,6 @@ export default (props: Props) => {
             </a>
           </h3>
           <PlantLocation location={station.location} />
-          <PlantWateringSchedule schedule={station.wateringSchedule} />
         </div>
       </div>
     </div>

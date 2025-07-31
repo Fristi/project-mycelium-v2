@@ -38,7 +38,7 @@ export const PlantEdit = () => {
         <div className="px-4 py-5 sm:p-6">
           <FormikProvider value={form}>
             <form className="space-y-10 divide-y divide-gray-900/10" onSubmit={form.handleSubmit}>
-              <div className="grid grid-cols-1 gap-x-8 gap-y-8 md:grid-cols-3">
+              <div className="gap-x-8 gap-y-8">
                 <div>
                   <div>
                     <h3 className="text-lg leading-6 font-medium text-gray-900">Plant basics</h3>

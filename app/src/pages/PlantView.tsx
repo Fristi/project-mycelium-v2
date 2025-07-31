@@ -3,7 +3,7 @@ import AreaGraph from "../components/AreaGraph";
 import { StationDetails, StationLog, StationMeasurement, WateringSchedule, getStationDetails, getStationLog } from "../api";
 import Retrieve from "../Retrieve";
 import PlantLocation from "../components/PlantLocation";
-import PlantWateringSchedule from "../components/PlantWateringSchedule";
+
 import { CalendarDaysIcon, EyeDropperIcon } from "@heroicons/react/20/solid";
 import moment from "moment";
 
@@ -28,11 +28,6 @@ const PlantLogItemScheduleChanged = (props: ScheduleChangedProps) => {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 ring-8 ring-white">
                 <CalendarDaysIcon className="h-5 w-5 text-emerald-500" aria-hidden="true" />
               </div>
-            </div>
-          </div>
-          <div className="min-w-0 flex-1 py-1.5">
-            <div className="text-sm text-gray-500">
-              Changed schedule to <PlantWateringSchedule schedule={props.schedule} /> - {relativeDate(props.on)}
             </div>
           </div>
         </div>
@@ -132,7 +127,6 @@ export const PlantView = () => {
                         <h1 className="text-2xl font-bold leading-7 text-gray-900 sm:leading-9 sm:truncate">{station.name}</h1>
                         <p>
                           <PlantLocation location={station.location} />
-                          <PlantWateringSchedule schedule={station.wateringSchedule} />
                         </p>
                       </div>
                     </div>

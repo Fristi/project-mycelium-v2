@@ -37,11 +37,11 @@ export const AuthContext: React.FC<Props> = ({ children }) => {
         <div className="bg-white shadow-md rounded-lg p-8 max-w-md w-full text-center">
           <h2 className="text-2xl font-bold mb-4 text-gray-800">Authentication Required</h2>
           <p className="text-gray-600 mb-6">
-            You need to be logged in to access this content.
+            You need to be logged in to access the app.
           </p>
           <button
             onClick={() => loginWithRedirect()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md transition duration-300"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-6 rounded-md transition duration-300"
           >
             Sign In
           </button>
