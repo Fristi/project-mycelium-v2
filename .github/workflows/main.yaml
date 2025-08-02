@@ -53,6 +53,9 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -71,11 +74,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dev-${{ github.sha }}
-          name: Backend Release dev-${{ github.sha }}
+          name: Central Release dev-${{ github.sha }}
           body: |
-            Backend release for commit ${{ github.sha }}
-            
-            Docker image: `dev-${{ github.sha }}`
+            Central release for commit ${{ github.sha }}
           files: target/release/main
           token: ${{ secrets.GITHUB_TOKEN }}
-
