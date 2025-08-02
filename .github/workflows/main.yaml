@@ -49,3 +49,30 @@ jobs:
             Once merged, ArgoCD will pick up this change and deploy the new version.
           branch: update-backend-dev-${{ github.sha }}
           delete-branch: true
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: publish
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build binary with Dagger
+        uses: dagger/dagger-for-github@8.0.0
+        with:
+          version: "latest"
+          cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+          verb: call
+          args: build-central | export target/release/main
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev-${{ github.sha }}
+          name: Backend Release dev-${{ github.sha }}
+          body: |
+            Backend release for commit ${{ github.sha }}
+            
+            Docker image: `dev-${{ github.sha }}`
+          files: target/release/main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
