@@ -208,9 +208,9 @@ export class MyceliumBuild {
    * Build the central component
    */
   @func()
-  buildCentral(): Container {
+  buildCentral(): File {
     return this.containerCentral()
-      .withExec(["cargo", "build", "--release"]);
+      .withExec(["cargo", "build", "--release"]).file("target/release/main");
   }
 
   /**

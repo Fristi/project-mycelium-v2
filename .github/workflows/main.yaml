@@ -68,7 +68,7 @@ jobs:
         run: create-client rust edge-client-backend | export edge-client-backend
         shell: dagger {0}
       - name: CI
-        run: build-central | export target/release/main
+        run: build-central | export central
         shell: dagger {0}
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -77,5 +77,5 @@ jobs:
           name: Central Release dev-${{ github.sha }}
           body: |
             Central release for commit ${{ github.sha }}
-          files: target/release/main
+          files: central
           token: ${{ secrets.GITHUB_TOKEN }}
