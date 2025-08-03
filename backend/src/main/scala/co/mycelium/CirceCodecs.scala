@@ -17,6 +17,7 @@ import io.circe.{Codec, Decoder, Encoder}
 import io.circe.generic.semiauto.deriveCodec
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
+import co.mycelium.endpoints.MyceliumError
 
 object CirceCodecs {
   implicit val genDevConfig: Configuration =
@@ -38,6 +39,7 @@ object CirceCodecs {
 
   implicit val codecStationEvent: Codec[StationEvent]         = deriveConfiguredCodec
   implicit val codecStationLog: Codec[StationLog]             = deriveCodec
+  implicit val codecMyceliumError: Codec[MyceliumError]             = deriveCodec
   implicit val codecStationReading: Codec[StationMeasurement] = deriveCodec
 
   implicit val codecInsert: Codec[StationInsert]          = deriveCodec

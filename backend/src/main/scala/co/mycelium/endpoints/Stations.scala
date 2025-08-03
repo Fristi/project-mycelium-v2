@@ -16,6 +16,8 @@ import sttp.tapir.server.http4s.Http4sServerInterpreter
 import java.time.Instant
 import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
+import sttp.tapir.server.http4s.Http4sServerOptions
+import sttp.tapir.server.model.ValuedEndpointOutput
 
 object Stations extends TapirSchemas {
 
@@ -117,9 +119,17 @@ object Stations extends TapirSchemas {
       }
     }
 
-    Http4sServerInterpreter[IO]().toRoutes(
-      List(list, add, delete, log, watered, checkin, details, update)
-    )
+    val routes = List(list, add, delete, log, watered, checkin, details, update)
+
+    def toMyceliumError(error: String): ValuedEndpointOutput[_] =
+      ValuedEndpointOutput(jsonBody[MyceliumError], MyceliumError(error))
+
+    val serverOptions = Http4sServerOptions.customiseInterceptors[IO]
+      .defaultHandlers(toMyceliumError)
+      .options
+
+    Http4sServerInterpreter(serverOptions)
+      .toRoutes(routes)
   }
 }
 
