@@ -18,6 +18,8 @@ import java.util.UUID
 import scala.concurrent.duration.FiniteDuration
 import sttp.tapir.server.http4s.Http4sServerOptions
 import sttp.tapir.server.model.ValuedEndpointOutput
+import sttp.tapir.server.interceptor.log.ServerLog
+import sttp.tapir.server.interceptor.log.DefaultServerLog
 
 object Stations extends TapirSchemas {
 
@@ -126,6 +128,7 @@ object Stations extends TapirSchemas {
 
     val serverOptions = Http4sServerOptions.customiseInterceptors[IO]
       .defaultHandlers(toMyceliumError)
+      .serverLog(Some(Http4sServerOptions.defaultServerLog[IO].logAllDecodeFailures(true)))
       .options
 
     Http4sServerInterpreter(serverOptions)
