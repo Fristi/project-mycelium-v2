@@ -128,7 +128,7 @@ object Stations extends TapirSchemas {
 
     val serverOptions = Http4sServerOptions.customiseInterceptors[IO]
       .defaultHandlers(toMyceliumError)
-      .serverLog(Some(Http4sServerOptions.defaultServerLog[IO].logAllDecodeFailures(true)))
+      .serverLog(Some(Http4sServerOptions.defaultServerLog[IO].logWhenHandled(true).logWhenReceived(true).logAllDecodeFailures(true)))
       .options
 
     Http4sServerInterpreter(serverOptions)
