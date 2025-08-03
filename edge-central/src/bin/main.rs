@@ -13,6 +13,7 @@ use edge_client_backend::{apis::configuration::{Configuration}, models::{Station
 use futures::{stream, StreamExt};
 use reqwest::{Client, Request, Url};
 use reqwest_middleware::ClientBuilder;
+use reqwest_tracing::TracingMiddleware;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc};
 
@@ -30,13 +31,23 @@ use crate::{
 };
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    dotenv()?;
-
+async fn main() {
     // Install a subscriber that logs to stdout with TRACE level enabled
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::TRACE) // allow trace level logs
         .init();
+
+    if let Err(e) = work().await {
+        tracing::error!(?e, "Application crashed");
+        std::process::exit(1);
+    }
+}
+
+
+async fn work() -> anyhow::Result<()> {
+    dotenv()?;
+
+
 
     let app_config = cfg::AppConfig::from_env()?;
     let opts = SqliteConnectOptions::from_str(&app_config.database_url)?
@@ -82,7 +93,10 @@ async fn main() -> anyhow::Result<()> {
 
     let client = ClientBuilder::new(Client::default())
         .with(AccessTokenMiddleware::new(token_watcher).with_predicate(AlwaysMatch))
+        .with(TracingMiddleware::default())
         .build();
+
+    
 
     let configuration: Configuration = Configuration {
         base_path: app_config.backend_url,
@@ -94,18 +108,24 @@ async fn main() -> anyhow::Result<()> {
         api_key: None                
     };
 
-    let provider = make_peripheral_sync_stream_provider(&app_config.peripheral_sync_mode).await?;
-    let stream = provider.stream().flat_map(stream::iter);
+    let results = edge_client_backend::apis::default_api::list_stations(&configuration).await?;
 
-    stream
-        .for_each(|m| async {
-            if let Err(err) = sync_measurements(&configuration, m).await {
-                tracing::error!("Failed to sync measurements {}", err);
-            }
-        })
-        .await;
+    tracing::debug!("Results: {:?}", results);
 
     Ok(())
+
+    // let provider = make_peripheral_sync_stream_provider(&app_config.peripheral_sync_mode).await?;
+    // let stream = provider.stream().flat_map(stream::iter);
+
+    // stream
+    //     .for_each(|m| async {
+    //         if let Err(err) = sync_measurements(&configuration, m).await {
+    //             tracing::error!("Failed to sync measurements {}", err);
+    //         }
+    //     })
+    //     .await;
+
+    // Ok(())
 }
 
 async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult) -> anyhow::Result<()> {

@@ -151,11 +151,11 @@ export class MyceliumBuild {
   /**
    * Container for building the central component with dbus support
    */
-  containerCentral(): Container {
+  containerCentral(arch: string): Container {
     const src = this.source;
 
     return dag
-      .container()
+    .container({ platform: arch as any })
       .from("rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0")
       .withExec(["sh", "-c", "echo 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20240701T000000Z bookworm main' > /etc/apt/sources.list"])
       .withExec(["sh", "-c", "apt-get update && apt-get install -y libdbus-1-3=1.14.10-1~deb12u1 libdbus-1-dev=1.14.10-1~deb12u1 dbus=1.14.10-1~deb12u1 pkg-config=1.8.1-1"])
@@ -206,8 +206,8 @@ export class MyceliumBuild {
    * Build the central component
    */
   @func()
-  buildCentral(): File {
-    return this.containerCentral()
+  buildCentral(@argument() arch: string = "linux/arm64"): File {
+    return this.containerCentral(arch)
       .withExec(["cargo", "build", "--release"]).file("target/release/main");
   }
 
@@ -215,8 +215,8 @@ export class MyceliumBuild {
    * Test the central component
    */
   @func()
-  async testCentral(): Promise<string> {
-    return this.containerCentral()
+  async testCentral(@argument() arch: string = "linux/arm64"): Promise<string> {
+    return this.containerCentral(arch)
       .withExec(["cargo", "test"]).stdout();
   }
 

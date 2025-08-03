@@ -24,16 +24,16 @@ impl LocalOnboarding {
 #[async_trait]
 impl Onboarding for LocalOnboarding {
     async fn process(&self) -> anyhow::Result<EdgeState> {
-        let mut wifi = wifi_rs::WiFi::new(None);
-        let wifi_connection = wifi
-            .connect(&self.wifi.ssid, &self.wifi.password)
-            .unwrap_or(false);
+        // let mut wifi = wifi_rs::WiFi::new(None);
+        // let wifi_connection = wifi
+        //     .connect(&self.wifi.ssid, &self.wifi.password)
+        //     .unwrap_or(false);
 
-        if !wifi_connection {
-            anyhow::bail!("Failed to connect to WiFi with provided credentials");
-        }
+        // if !wifi_connection {
+        //     anyhow::bail!("Failed to connect to WiFi with provided credentials");
+        // }
 
-        sleep(Duration::from_secs(3)).await;
+        // sleep(Duration::from_secs(3)).await;
 
         let device_code = crate::auth::auth0::request_device_code(&self.auth0).await?;
 

@@ -45,25 +45,36 @@ impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamPr
     fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>> {
         let adapter = self.adapter.clone();
         let stream = futures::stream::unfold(adapter, |adapter| async {
-            adapter
+            if let Err(err) = adapter
                 .start_scan(ScanFilter {
                     services: vec![CURRENT_TIME_SERVICE],
                 })
-                .await
-                .ok()?;
+                .await {
+                tracing::error!(?err, "Btleplug error occurred");
+                return None
+            };
+
+            
 
             let peripherals = adapter.peripherals().await.ok()?;
             let mut results = vec![];
 
-            println!("Found {} peripherals", peripherals.len());
+            tracing::info!("Found {} peripherals", peripherals.len());
 
             for peripheral in peripherals {
                 let now = Utc::now();
-                let result = sync(peripheral, now).await.ok()?;
-                results.push(result);
+                match sync(peripheral, now).await {
+                    Err(err) => tracing::warn!(?err, "Sync error occurred"),
+                    Ok(result) => results.push(result)
+                }
             }
 
             sleep(Duration::from_secs(2)).await;
+
+            if let Err(err) = adapter.stop_scan().await {
+                tracing::error!(?err, "Btleplug error occurred");
+                return None
+            };
 
             Some((results, adapter))
         });
@@ -109,6 +120,8 @@ async fn sync(peripheral: Peripheral, now: DateTime<Utc>) -> anyhow::Result<Peri
         peripheral.connect().await?;
     }
 
+    peripheral.discover_services().await?;
+
     let address_char =
         find_characteristic_or_disconnect(&peripheral, ADDRESS_SERVICE, ADDRESS_CHAR).await?;
     let data = peripheral.read(&address_char).await?;
@@ -151,7 +164,7 @@ async fn sync(peripheral: Peripheral, now: DateTime<Utc>) -> anyhow::Result<Peri
 
         match MeasurementSerieEntry::from_tlv(segment) {
             Ok(entry) => measurements.push(entry),
-            Err(err) => println!("Error decoding measurement entry {:?}", err),
+            Err(err) => tracing::warn!("Error decoding measurement entry {:?}", err),
         }
     }
 
