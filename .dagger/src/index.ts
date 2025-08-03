@@ -160,6 +160,7 @@ export class MyceliumBuild {
       .from("rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0")
       .withExec(["sh", "-c", "echo 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20240701T000000Z bookworm main' > /etc/apt/sources.list"])
       .withExec(["sh", "-c", "apt-get update && apt-get install -y libdbus-1-3=1.14.10-1~deb12u1 libdbus-1-dev=1.14.10-1~deb12u1 dbus=1.14.10-1~deb12u1 pkg-config=1.8.1-1"])
+      .withExec(["sh", "-c", "rustup", "target", "add", "aarch64-unknown-linux-musl"])
       .withMountedCache("/root", dag.cacheVolume("edge-central-root"))
       .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("edge-central-cargo-registry"))
       .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("edge-central-cargo-git"))
