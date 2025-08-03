@@ -44,7 +44,7 @@ object Main extends IOApp {
     val routes = (server <+> files).orNotFound
 
     CORS.policy.withAllowOriginAll
-      .withAllowCredentials(false)
+      .withAllowCredentials(true)
       .apply(routes)
   }
 
