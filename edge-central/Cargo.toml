@@ -29,6 +29,7 @@ aliri_tokens = "0.3.2"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 predicates-core = "1.0.9"
+openssl = { version = "0.10", features = ["vendored"] }
 
 [dev-dependencies]
 serial_test = "3.2.0"

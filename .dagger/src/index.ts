@@ -209,7 +209,7 @@ export class MyceliumBuild {
   @func()
   buildCentral(): File {
     return this.containerCentral()
-      .withExec(["cargo", "build", "--release"]).file("target/release/main");
+      .withExec(["cargo", "build", "--target", "aarch64-unknown-linux-musl", "--release"]).file("target/release/main");
   }
 
   /**
