@@ -104,11 +104,13 @@ object Main extends IOApp {
 //      _ <- Resource.eval(createBucket(s3Client))
 //      s3 <- Resource.eval(IO.fromOption(S3Store.builder[IO](s3Client).build.toOption)(new Throwable("Wat?")))
       repos = Repositories.fromTransactor(tx)
+      app = errorHandling(httpApp(repos))
+      app_logging = org.http4s.server.middleware.Logger.httpApp(true, true)(app)
       server <- EmberServerBuilder
         .default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(port"8080")
-        .withHttpApp(errorHandling(httpApp(repos)))
+        .withHttpApp(app_logging)
         .build
     } yield server
 }
