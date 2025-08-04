@@ -17,7 +17,7 @@ object Auth {
     implicit val decoder: Decoder[AccessToken] = deriveDecoder
   }
 
-  val jwkUrl = sys.env.get("AUTH0_BASE_URL").getOrElse("https://mycelium-green.eu.auth0.com")
+  val jwkUrl = sys.env.get("AUTH0_BASE_URL").getOrElse("https://mycelium-greens.eu.auth0.com")
   val jwkProvider = new JwkProviderBuilder(jwkUrl)
     .cached(3600, 3600, TimeUnit.SECONDS)
     .build()
