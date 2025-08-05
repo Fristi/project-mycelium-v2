@@ -43,8 +43,10 @@ object Main extends IOApp {
     val files  = fileService[IO](FileService.Config("."))
     val routes = (server <+> files).orNotFound
 
-    CORS.policy.withAllowOriginAll
+    CORS.policy
+      .withAllowOriginAll
       .withAllowCredentials(true)
+      .withAllowMethodsAll
       .apply(routes)
   }
 
