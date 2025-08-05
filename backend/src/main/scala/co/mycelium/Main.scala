@@ -26,6 +26,7 @@ import software.amazon.awssdk.services.s3.model.{BucketAlreadyExistsException, C
 
 import java.net.URI
 import java.time.Duration
+import org.http4s.Method
 
 object Main extends IOApp {
 
@@ -46,7 +47,7 @@ object Main extends IOApp {
     CORS.policy
       .withAllowOriginAll
       .withAllowCredentials(true)
-      .withAllowMethodsAll
+      .withAllowMethodsIn(Set(Method.GET, Method.POST, Method.PUT, Method.OPTIONS))
       .withAllowHeadersAll
       .withExposeHeadersAll
       .withMaxAgeDisableCaching
