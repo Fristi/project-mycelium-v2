@@ -9,7 +9,7 @@ import co.mycelium.endpoints.{Avatar, Stations}
 import com.comcast.ip4s._
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.{Router, Server}
-import org.http4s.server.middleware.{ErrorAction, ErrorHandling}
+import org.http4s.server.middleware.{CORS, CORSConfig, ErrorAction, ErrorHandling}
 import org.http4s.server.staticcontent._
 import org.http4s.{HttpApp, Request, Response}
 import org.typelevel.log4cats.LoggerFactory
@@ -43,7 +43,9 @@ object Main extends IOApp {
     val files  = fileService[IO](FileService.Config("."))
     val routes = (server <+> files).orNotFound
 
-    routes
+    CORS.policy.withAllowOriginAll
+      .withAllowCredentials(true)
+      .apply(routes)
   }
 
   private def errorHandling(route: Kleisli[IO, Request[IO], Response[IO]]) =
