@@ -29,7 +29,9 @@ edge-client-backend
 **/.metals
 **/.bsp
 **/data
-metals.sbt
+backend/project/metals.sbt
+backend/project/project
+backend/project/.bloop
 
 # Logs, dumps, debug tools
 *.dump

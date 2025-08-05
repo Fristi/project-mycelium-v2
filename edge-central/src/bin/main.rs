@@ -108,24 +108,18 @@ async fn work() -> anyhow::Result<()> {
         api_key: None                
     };
 
-    let results = edge_client_backend::apis::default_api::list_stations(&configuration).await?;
+    let provider = make_peripheral_sync_stream_provider(&app_config.peripheral_sync_mode).await?;
+    let stream = provider.stream().flat_map(stream::iter);
 
-    tracing::debug!("Results: {:?}", results);
+    stream
+        .for_each(|m| async {
+            if let Err(err) = sync_measurements(&configuration, m).await {
+                tracing::error!("Failed to sync measurements {}", err);
+            }
+        })
+        .await;
 
     Ok(())
-
-    // let provider = make_peripheral_sync_stream_provider(&app_config.peripheral_sync_mode).await?;
-    // let stream = provider.stream().flat_map(stream::iter);
-
-    // stream
-    //     .for_each(|m| async {
-    //         if let Err(err) = sync_measurements(&configuration, m).await {
-    //             tracing::error!("Failed to sync measurements {}", err);
-    //         }
-    //     })
-    //     .await;
-
-    // Ok(())
 }
 
 async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult) -> anyhow::Result<()> {

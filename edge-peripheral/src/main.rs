@@ -50,7 +50,7 @@ async fn main(_spawner: Spawner) {
 
     let mut cfg = RtcSleepConfig::deep();
     cfg.set_rtc_fastmem_pd_en(false);
-    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10));
+    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10 * 60));
     
     match boot_args {
         DeviceBootArgs::AwaitingTimeSync { mut rtc, mac, ble } => {
@@ -72,7 +72,7 @@ async fn main(_spawner: Spawner) {
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
         DeviceBootArgs::Buffering { mut rtc, mut gauge, measurements, mut rng } => {
-            info!("Buffering");
+            info!("Buffering, current num entries {0}", measurements.buckets.len());
 
             let measurement = gauge.sample().await;
             info!("battery: {}, lux: {}, temperature: {}, humidity: {}", measurement.battery, measurement.lux, measurement.temperature, measurement.humidity);
