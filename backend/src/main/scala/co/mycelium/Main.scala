@@ -47,6 +47,9 @@ object Main extends IOApp {
       .withAllowOriginAll
       .withAllowCredentials(true)
       .withAllowMethodsAll
+      .withAllowHeadersAll
+      .withExposeHeadersAll
+      .withMaxAgeDisableCaching
       .apply(routes)
   }
 
