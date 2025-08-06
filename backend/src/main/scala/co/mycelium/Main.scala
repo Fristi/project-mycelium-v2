@@ -27,6 +27,8 @@ import software.amazon.awssdk.services.s3.model.{BucketAlreadyExistsException, C
 import java.net.URI
 import java.time.Duration
 import org.http4s.Method
+import sttp.tapir.server.interceptor.cors
+import org.http4s.server.middleware.CORSPolicy
 
 object Main extends IOApp {
 
@@ -44,14 +46,7 @@ object Main extends IOApp {
     val files  = fileService[IO](FileService.Config("."))
     val routes = (server <+> files).orNotFound
 
-    CORS.policy
-      .withAllowOriginAll
-      .withAllowCredentials(true)
-      .withAllowMethodsIn(Set(Method.GET, Method.POST, Method.PUT, Method.OPTIONS))
-      .withAllowHeadersAll
-      .withExposeHeadersAll
-      .withMaxAgeDisableCaching
-      .apply(routes)
+    routes
   }
 
   private def errorHandling(route: Kleisli[IO, Request[IO], Response[IO]]) =

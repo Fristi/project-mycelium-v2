@@ -20,6 +20,8 @@ import sttp.tapir.server.http4s.Http4sServerOptions
 import sttp.tapir.server.model.ValuedEndpointOutput
 import sttp.tapir.server.interceptor.log.ServerLog
 import sttp.tapir.server.interceptor.log.DefaultServerLog
+import sttp.tapir.server.interceptor.cors.CORSInterceptor
+import sttp.tapir.server.interceptor.cors.CORSConfig
 
 object Stations extends TapirSchemas {
 
@@ -129,6 +131,7 @@ object Stations extends TapirSchemas {
     val serverOptions = Http4sServerOptions.customiseInterceptors[IO]
       .defaultHandlers(toMyceliumError)
       .serverLog(Some(Http4sServerOptions.defaultServerLog[IO].logWhenHandled(true).logWhenReceived(true).logAllDecodeFailures(true)))
+      .corsInterceptor(CORSInterceptor.customOrThrow[IO](CORSConfig.default.allowCredentials))
       .options
 
     Http4sServerInterpreter(serverOptions)
