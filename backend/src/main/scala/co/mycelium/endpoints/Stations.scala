@@ -22,6 +22,7 @@ import sttp.tapir.server.interceptor.log.ServerLog
 import sttp.tapir.server.interceptor.log.DefaultServerLog
 import sttp.tapir.server.interceptor.cors.CORSInterceptor
 import sttp.tapir.server.interceptor.cors.CORSConfig
+import sttp.model.headers.Origin
 
 object Stations extends TapirSchemas {
 
@@ -60,6 +61,15 @@ object Stations extends TapirSchemas {
 
     val all = Set(list, add, details, update, delete, checkIn, watered, log)
   }
+
+  def toMyceliumError(error: String): ValuedEndpointOutput[_] =
+    ValuedEndpointOutput(jsonBody[MyceliumError], MyceliumError(error))
+
+  val serverOptions = Http4sServerOptions.customiseInterceptors[IO]
+    .defaultHandlers(toMyceliumError)
+    .serverLog(Some(Http4sServerOptions.defaultServerLog[IO].logWhenHandled(true).logWhenReceived(true).logAllDecodeFailures(true)))
+    .corsInterceptor(CORSInterceptor.customOrThrow[IO](CORSConfig.default.allowCredentials.allowOrigin(Origin.Host("http", "localhost", Some(1420)))))
+    .options
 
   def routes(repos: Repositories[IO]): HttpRoutes[IO] = {
 
@@ -125,14 +135,7 @@ object Stations extends TapirSchemas {
 
     val routes = List(list, add, delete, log, watered, checkin, details, update)
 
-    def toMyceliumError(error: String): ValuedEndpointOutput[_] =
-      ValuedEndpointOutput(jsonBody[MyceliumError], MyceliumError(error))
 
-    val serverOptions = Http4sServerOptions.customiseInterceptors[IO]
-      .defaultHandlers(toMyceliumError)
-      .serverLog(Some(Http4sServerOptions.defaultServerLog[IO].logWhenHandled(true).logWhenReceived(true).logAllDecodeFailures(true)))
-      .corsInterceptor(CORSInterceptor.customOrThrow[IO](CORSConfig.default.allowCredentials))
-      .options
 
     Http4sServerInterpreter(serverOptions)
       .toRoutes(routes)
