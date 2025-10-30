@@ -125,7 +125,7 @@ export class MyceliumBuild {
       .withExec(["sh", "-c", "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"])
       .withExec([
         "sh", "-c",
-        "apt-get update && apt-get install -y libwebkit2gtk-4.1-dev=2.48.3-1~deb12u1 build-essential=12.9 wget=1.21.3-1+deb12u1 file=1:5.44-3 libxdo-dev=1:3.20160805.1-5 libssl-dev=3.0.16-1~deb12u1 libayatana-appindicator3-dev=0.5.92-1 librsvg2-dev=2.54.7+dfsg-1~deb12u1 xdg-utils=1.1.3-4.1 nodejs=20.19.4-1nodesource1"
+        "apt-get update && apt-get install -y libwebkit2gtk-4.1-dev build-essential wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils nodejs"
       ])
       .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("app-cargo-registry"))
       .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("app-cargo-git"))
