@@ -234,8 +234,7 @@ export class MyceliumBuild {
     await Promise.all([
       this.buildPeripheral(arch),
       this.testCentral(),
-      this.buildBackend(),
-      this.buildApp()
+      this.buildBackend()
     ]);
 
     return "CI pipeline completed successfully";
