@@ -1,10 +1,13 @@
 use chrono::NaiveDateTime;
-use heapless::Vec;
 use edge_protocol::{Measurement};
 use timeseries::Series;
 
+const NR_ENTRIES: usize = 4 * 6;
+
+pub type Measurements = Series<NR_ENTRIES, NaiveDateTime, Measurement>;
+
 pub enum DeviceState {
     AwaitingTimeSync,
-    Buffering(Series<6, NaiveDateTime, Measurement>),
-    Flush(Series<6, NaiveDateTime, Measurement>)
+    Buffering(Measurements),
+    Flush(Measurements)
 }

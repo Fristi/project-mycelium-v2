@@ -9,21 +9,22 @@ pub mod types;
 use core::cell::RefCell;
 
 use bt_hci::controller::ExternalController;
-use chrono::NaiveDateTime;
 use edge_protocol::{Measurement, MeasurementSerieEntry};
-use esp_hal::analog::adc::{Adc, AdcChannel, AdcConfig};
+use embassy_futures::select::{select, Either};
+use embassy_time::{Duration, Timer};
+use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_hal::gpio::{GpioPin, Output, OutputConfig};
 use defmt::{error, info, flush};
 use embassy_executor::Spawner;
 use esp_hal::i2c::master::BusTimeout;
-use esp_hal::{peripherals, ram};
+use esp_hal::ram;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::{
-    peripherals::{Peripherals, BT },
+    peripherals::Peripherals,
     rtc_cntl::sleep::{RtcSleepConfig, TimerWakeupSource}
 };
-use esp_hal::timer::timg::{self, TimerGroup};
+use esp_hal::timer::timg::{TimerGroup};
 use esp_hal::{clock::CpuClock, time::Rate};
 use esp_wifi::ble::controller::BleConnector;
 use esp_wifi::{init, EspWifiController};
@@ -33,7 +34,7 @@ use heapless::Vec;
 use timeseries::Series;
 
 use crate::battery::BatteryMeasurement;
-use crate::types::DeviceState;
+use crate::types::{DeviceState, Measurements};
 
 
 // TODO: This is a hack to get the state of the device across the different states.
@@ -103,32 +104,32 @@ async fn main(_spawner: Spawner) {
                 .map(|entry| MeasurementSerieEntry { timestamp: entry.range.start, measurement: entry.value })
                 .collect();
             
-            ble::run(ble, &mut rtc, mac.clone(), entries).await;
+            let future = select(
+                ble::run(ble, &mut rtc, mac.clone(), entries),
+                Timer::after(Duration::from_secs(10))
+            );
 
-            let measurement = gauge.sample().await;
+            match future.await {
+                Either::First(_) => {
+                    let measurement = gauge.sample().await;
+                    let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
 
-            let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
+                    new_measurements.append_monotonic(rtc.current_time(), measurement);
 
-            new_measurements.append_monotonic(rtc.current_time(), measurement);
+                    unsafe {
+                        STATE = DeviceState::Buffering(new_measurements);
+                    }
 
-            unsafe {
-                STATE = DeviceState::Buffering(new_measurements);
-            }
-
-            info!("Sleeping");
+                    info!("Sleeping");
+                },
+                Either::Second(_) => {
+                    info!("Timed out ...")
+                }
+            };
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
     };
-}
-
-fn random_measurement(rng: &mut Rng) -> Measurement {
-    Measurement {
-        battery: (rng.random() % 101) as u8,
-        lux: (rng.random() % 100001) as f32,
-        temperature: (rng.random() % 46) as f32,
-        humidity: (rng.random() % 101) as f32
-    }
 }
 
 #[panic_handler]
@@ -153,8 +154,6 @@ macro_rules! mk_static {
         x
     }};
 }
-
-type Measurements = Series<6, NaiveDateTime, Measurement>;
 
 pub enum DeviceBootArgs<'a> {
     AwaitingTimeSync { rtc: Rtc<'a>, mac: [u8; 6], ble: ExternalController<BleConnector<'a>, 20> },
