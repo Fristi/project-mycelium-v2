@@ -94,7 +94,7 @@ async fn main(_spawner: Spawner) {
                         STATE = new_state;
                     }
                 },
-                Err(err) => {
+                Err(_err) => {
                     error!("Error while measuring")
                 }
             };
@@ -127,7 +127,7 @@ async fn main(_spawner: Spawner) {
                                 STATE = DeviceState::Buffering(new_measurements);
                             }
                         },
-                        Err(err) => {
+                        Err(_err) => {
                             error!("Error while measuring")  
                         }
                     }
