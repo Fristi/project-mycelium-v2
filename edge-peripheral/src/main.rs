@@ -11,19 +11,21 @@ use core::cell::RefCell;
 use bt_hci::controller::ExternalController;
 use chrono::NaiveDateTime;
 use edge_protocol::{Measurement, MeasurementSerieEntry};
-use esp_hal::analog::adc::{Adc, AdcChannel, AdcConfig};
+use embassy_futures::select::{Either, select};
+use embassy_time::{Duration, Timer};
+use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_hal::gpio::{GpioPin, Output, OutputConfig};
 use defmt::{error, info, flush};
 use embassy_executor::Spawner;
 use esp_hal::i2c::master::BusTimeout;
-use esp_hal::{peripherals, ram};
+use esp_hal::ram;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::{
-    peripherals::{Peripherals, BT },
+    peripherals::Peripherals,
     rtc_cntl::sleep::{RtcSleepConfig, TimerWakeupSource}
 };
-use esp_hal::timer::timg::{self, TimerGroup};
+use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, time::Rate};
 use esp_wifi::ble::controller::BleConnector;
 use esp_wifi::{init, EspWifiController};
@@ -109,24 +111,33 @@ async fn main(_spawner: Spawner) {
                 .map(|entry| MeasurementSerieEntry { timestamp: entry.range.start, measurement: entry.value })
                 .collect();
             
-            ble::run(ble, &mut rtc, mac.clone(), entries).await;
+            let future = select(
+                ble::run(ble, &mut rtc, mac.clone(), entries),
+                Timer::after(Duration::from_secs(10))
+            );
 
-            let measurement = gauge.sample().await;
+            match future.await {
+                Either::First(_) => {
+                    match gauge.sample().await {
+                        Ok(m) => {
+                            let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
 
-            match measurement {
-                Ok(m) => {
-                    let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
+                            new_measurements.append_monotonic(rtc.current_time(), m);
 
-                    new_measurements.append_monotonic(rtc.current_time(), m);
-
-                    unsafe {
-                        STATE = DeviceState::Buffering(new_measurements);
+                            unsafe {
+                                STATE = DeviceState::Buffering(new_measurements);
+                            }
+                        },
+                        Err(_err) => {
+                            error!("Error while measuring")  
+                        }
                     }
+                    info!("Sleeping");
                 },
-                Err(err) => {
-                      error!("Error while measuring")  
+                Either::Second(_) => {
+                    info!("Timed out ...")
                 }
-            }
+            };
         
 
             rtc.sleep(&cfg, &[&wakeup_source]);
