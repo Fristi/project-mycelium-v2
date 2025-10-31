@@ -69,7 +69,7 @@ impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamPr
                 }
             }
 
-            sleep(Duration::from_secs(2)).await;
+            sleep(Duration::from_secs(1)).await;
 
             if let Err(err) = adapter.stop_scan().await {
                 tracing::error!(?err, "Btleplug error occurred");
