@@ -114,7 +114,8 @@ pub struct Measurement {
     pub battery: u8,
     pub lux: f32,
     pub temperature: f32,
-    pub humidity: f32
+    pub humidity: f32,
+    pub soil_pf: f32
 }
 
 impl Deviate for Measurement {
@@ -131,7 +132,8 @@ impl Measurement {
         battery: 1,
         lux: 100.0,
         temperature: 1.0,
-        humidity: 1.0
+        humidity: 1.0,
+        soil_pf: 1.0
     };
 }
 
@@ -171,6 +173,13 @@ impl Measurement {
         tlv[index] = 4; // Length
         index += 1;
         tlv[index..index + 4].copy_from_slice(&self.humidity.to_le_bytes());
+
+        // Soil_pf (Type: 5)
+        tlv[index] = 5; // Type
+        index += 1;
+        tlv[index] = 4; // Length
+        index += 1;
+        tlv[index..index + 4].copy_from_slice(&self.soil_pf.to_le_bytes());
         
         tlv
     }
@@ -182,6 +191,7 @@ impl Measurement {
             lux: 0.0,
             temperature: 0.0,
             humidity: 0.0,
+            soil_pf: 0.0
         };
         
         let mut i = 0;
@@ -223,6 +233,12 @@ impl Measurement {
                         return Err("Invalid humidity length");
                     }
                     measurement.humidity = f32::from_le_bytes([value_data[0], value_data[1], value_data[2], value_data[3]]);
+                },
+                5 => { // Soil_pf
+                    if length != 4 {
+                        return Err("Invalid humidity length");
+                    }
+                    measurement.soil_pf = f32::from_le_bytes([value_data[0], value_data[1], value_data[2], value_data[3]]);
                 },
                 _ => return Err("Unknown TLV type"),
             }
