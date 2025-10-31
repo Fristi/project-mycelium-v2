@@ -75,22 +75,28 @@ async fn main(_spawner: Spawner) {
             info!("Buffering, current num entries {0}", measurements.buckets.len());
 
             let measurement = gauge.sample().await;
-            info!("battery: {}, lux: {}, temperature: {}, humidity: {}", measurement.battery, measurement.lux, measurement.temperature, measurement.humidity);
-            let mut new_measurements = (*measurements).clone();
-            
-            new_measurements.append_monotonic(rtc.current_time(), measurement);
 
-            let new_state = if new_measurements.is_full() {
-                DeviceState::Flush(new_measurements)
-            } else {  
-                DeviceState::Buffering(new_measurements)
+            match measurement {
+                Ok(m) => {
+                    info!("battery: {}, lux: {}, temperature: {}, humidity: {}", m.battery, m.lux, m.temperature, m.humidity);
+                    let mut new_measurements = (*measurements).clone();
+                    
+                    new_measurements.append_monotonic(rtc.current_time(), m);
+
+                    let new_state = if new_measurements.is_full() {
+                        DeviceState::Flush(new_measurements)
+                    } else {  
+                        DeviceState::Buffering(new_measurements)
+                    };
+
+                    unsafe {
+                        STATE = new_state;
+                    }
+                },
+                Err(err) => {
+                    error!("Error while measuring")
+                }
             };
-
-            unsafe {
-                STATE = new_state;
-            }
-
-            info!("Sleeping");
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
@@ -107,15 +113,21 @@ async fn main(_spawner: Spawner) {
 
             let measurement = gauge.sample().await;
 
-            let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
+            match measurement {
+                Ok(m) => {
+                    let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
 
-            new_measurements.append_monotonic(rtc.current_time(), measurement);
+                    new_measurements.append_monotonic(rtc.current_time(), m);
 
-            unsafe {
-                STATE = DeviceState::Buffering(new_measurements);
+                    unsafe {
+                        STATE = DeviceState::Buffering(new_measurements);
+                    }
+                },
+                Err(err) => {
+                      error!("Error while measuring")  
+                }
             }
-
-            info!("Sleeping");
+        
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
@@ -165,9 +177,12 @@ pub enum DeviceBootArgs<'a> {
 impl <'a> DeviceBootArgs<'a> {
     pub fn boot(state: &'a DeviceState) -> Self {
 
-        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let cpu_clock = match state {
+            DeviceState::AwaitingTimeSync | DeviceState::Flush(_) => CpuClock::max(),
+            DeviceState::Buffering(_) => CpuClock::_80MHz,
+        };
+        let config = esp_hal::Config::default().with_cpu_clock(cpu_clock);
         let mut peripherals: Peripherals = esp_hal::init(config);
-
 
         esp_alloc::heap_allocator!(size: 72 * 1024);
 
