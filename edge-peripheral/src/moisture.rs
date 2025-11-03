@@ -1,35 +1,62 @@
+use bt_hci::cmd::info;
+use defmt::info;
 use embedded_hal::{
     delay::DelayNs,
-    i2c::{I2c, SevenBitAddress}
+    i2c::{I2c, SevenBitAddress},
 };
-
 use crate::anyhow_utils::*;
 
-pub fn measure_soil<I2C, D>( 
-    i2c: &mut I2C,
-    delay: &mut D,
-) -> anyhow::Result<f32>
-where
-    I2C: I2c<SevenBitAddress>,
-    D: DelayNs,
-{
+/// Soil sensor state
+pub struct SoilSensor<I2C> {
+    i2c: I2C
+}
 
-    // Begin transmission to 0x55 and send command 0x01
-    i2c.write(0x55, &[0x01]).with_anyhow("Unable to write to i2c")?;
+impl<I2C> SoilSensor<I2C> {
+    pub fn new(i2c: I2C) -> Self {
+        Self {
+            i2c
+        }
+    }
 
-    // Delay 10ms (for humidity/temperature in parallel)
-    delay.delay_ms(10);
+    pub fn start(&mut self) -> anyhow::Result<()>
+    where
+        I2C: I2c<SevenBitAddress>
+    {
+        self.i2c
+            .write(0x55 | 0, &[0x10 | 0x01])
+            .with_anyhow("Unable to start soil conversion")?;
 
-    // Request 3 bytes from 0x55
-    let mut buf = [0u8; 3];
-    i2c.read(0x55, &mut buf).with_anyhow("Unable to read from moisture")?;
+        self.i2c
+            .write(0x55 | 0, &[0x01])
+            .with_anyhow("Unable to start soil conversion")?;
 
-    let dec_h = buf[0];
-    let dec_l = buf[1];
-    let frac = buf[2];
+        Ok(())
+    }
 
-    let pfdec = ((dec_h as u16) << 8) | (dec_l as u16);
-    let pf = pfdec as f32 + (frac as f32 / 256.0);
+    pub fn read<D>(&mut self, delay: &mut D) -> anyhow::Result<f32>
+    where
+        I2C: I2c<SevenBitAddress>,
+        D: DelayNs,
+    {
+        self.i2c
+            .write(0x55 | 0, &[0x10 | 0x02])
+            .with_anyhow("Unable to trigger soil read")?;
 
-    Ok(pf)
+        delay.delay_us(150);
+
+        let mut buf = [0u8; 3];
+        self.i2c
+            .read(0x55 | 1, &mut buf)
+            .with_anyhow("Unable to read soil data")?;
+
+        let d0 = buf[0];
+        let d1 = buf[1];
+        let d2 = buf[2];
+
+        info!("d0: {}, d1: {}, d2: {}", d0, d1, d2);
+
+        let pf = d0 as f32 + (d1 as f32 * 256.0) + (d2 as f32 / 256.0);
+        
+        Ok(pf)
+    }
 }

@@ -18,7 +18,7 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Timer};
 use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_hal::gpio::{GpioPin, Output, OutputConfig};
-use defmt::{error, info, flush};
+use defmt::{Debug2Format, error, flush, info};
 use embassy_executor::Spawner;
 use esp_hal::i2c::master::BusTimeout;
 use esp_hal::ram;
@@ -59,10 +59,10 @@ async fn main(_spawner: Spawner) {
             loop {
                 match gauge.sample().await {
                     Ok(res) => {
-                        info!("Measurement {:?}", res.soil_pf)
+                        info!("Measurement {:?} {:?}", res.soil_pf, res.battery)
                     },
-                    Err(_) => {
-                        info!("Error occured!")
+                    Err(err) => {
+                        info!("Error occured! {:?}", Debug2Format(&err))
                     }
                 };
 
@@ -245,22 +245,41 @@ impl <'a> DeviceBootArgs<'a> {
                 let mut adc_config = AdcConfig::new();
                 let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
                 let adc = Adc::new(peripherals.ADC1, adc_config);
-                let output_config = OutputConfig::default();
+                let output_config_pcb = OutputConfig::default();
             
-                let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config);
-                let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config);
-                let mut pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config);
+                let i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config_pcb);
+                let i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config_pcb);
+                let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
                 
-                let mut i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                let i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
                     peripherals.I2C0,
                     esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
                 )
                 .expect("I2c init failed")
                 .with_sda(i2c_pcb_sda)
                 .with_scl(i2c_pcb_scl));
+
+                
+                let output_config_ext = OutputConfig::default();
+                    // .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
+                    // .with_pull(esp_hal::gpio::Pull::Up);
+
+                let mut i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::High, output_config_ext);
+                let mut i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::High, output_config_ext);
+
+                i2c_ext_sda.set_high();
+                i2c_ext_scl.set_high();
+                
+                let i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                    peripherals.I2C1,
+                    esp_hal::i2c::master::Config::default()
+                )
+                .expect("I2c init failed")
+                .with_sda(i2c_ext_sda)
+                .with_scl(i2c_ext_scl));
             
                 let battery = BatteryMeasurement::new(adc, pin);
-                let gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
+                let gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
 
 
                 Self::Buffering { rtc, gauge, measurements, rng }
@@ -288,8 +307,8 @@ impl <'a> DeviceBootArgs<'a> {
                 let adc = Adc::new(peripherals.ADC1, adc_config);
                 let output_config = OutputConfig::default();
             
-                let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::High, output_config);
-                let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::High, output_config);
+                let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config);
+                let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config);
                 let mut pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config);
 
                 let i2c = esp_hal::i2c::master::I2c::new(
@@ -301,10 +320,22 @@ impl <'a> DeviceBootArgs<'a> {
                 .with_scl(i2c_pcb_scl);
                 
                 let mut i2c_pcb_refcell = RefCell::new(i2c);
+
+                let mut i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::High, output_config);
+                let mut i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::High, output_config);
+
+                
+                let mut i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                    peripherals.I2C1,
+                    esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
+                )
+                .expect("I2c init failed")
+                .with_sda(i2c_ext_sda)
+                .with_scl(i2c_ext_scl));
                 
             
                 let battery = BatteryMeasurement::new(adc, pin);
-                let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr,battery);
+                let mut gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr,battery);
 
                 Self::Flush { rtc, mac, gauge, measurements, ble: controller, rng }
             }
