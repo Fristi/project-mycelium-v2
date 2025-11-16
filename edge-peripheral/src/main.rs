@@ -59,7 +59,7 @@ async fn main(_spawner: Spawner) {
             loop {
                 match gauge.sample().await {
                     Ok(res) => {
-                        info!("Measurement {:?} {:?}", res.soil_pf, res.battery)
+                        info!("Measurement {:?} pF {:?} % {:?} lx {:?} C {:?} RH %", res.soil_pf, res.battery, res.lux, res.temperature, res.humidity)
                     },
                     Err(err) => {
                         info!("Error occured! {:?}", Debug2Format(&err))
@@ -260,16 +260,13 @@ impl <'a> DeviceBootArgs<'a> {
                 .with_scl(i2c_pcb_scl));
 
                 
-                let output_config_ext = OutputConfig::default();
-                    // .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
-                    // .with_pull(esp_hal::gpio::Pull::Up);
+                let output_config_ext = OutputConfig::default()
+                    .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
+                    .with_pull(esp_hal::gpio::Pull::Up);
 
-                let mut i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::High, output_config_ext);
-                let mut i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::High, output_config_ext);
+                let i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::Low, output_config_ext);
+                let i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::Low, output_config_ext);
 
-                i2c_ext_sda.set_high();
-                i2c_ext_scl.set_high();
-                
                 let i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
                     peripherals.I2C1,
                     esp_hal::i2c::master::Config::default()

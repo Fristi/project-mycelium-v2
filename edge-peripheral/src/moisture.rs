@@ -1,9 +1,5 @@
-use bt_hci::cmd::info;
-use defmt::info;
-use embedded_hal::{
-    delay::DelayNs,
-    i2c::{I2c, SevenBitAddress},
-};
+use embassy_time::Timer;
+use embedded_hal::{i2c::{I2c, SevenBitAddress}};
 use crate::anyhow_utils::*;
 
 /// Soil sensor state
@@ -23,37 +19,30 @@ impl<I2C> SoilSensor<I2C> {
         I2C: I2c<SevenBitAddress>
     {
         self.i2c
-            .write(0x55 | 0, &[0x10 | 0x01])
-            .with_anyhow("Unable to start soil conversion")?;
-
-        self.i2c
-            .write(0x55 | 0, &[0x01])
+            .write(0x55, &[0x10 | 0x01, 0x01])
             .with_anyhow("Unable to start soil conversion")?;
 
         Ok(())
     }
 
-    pub fn read<D>(&mut self, delay: &mut D) -> anyhow::Result<f32>
+    pub async fn read(&mut self) -> anyhow::Result<f32>
     where
-        I2C: I2c<SevenBitAddress>,
-        D: DelayNs,
+        I2C: I2c<SevenBitAddress>
     {
         self.i2c
-            .write(0x55 | 0, &[0x10 | 0x02])
+            .write(0x55, &[0x10 | 0x02])
             .with_anyhow("Unable to trigger soil read")?;
 
-        delay.delay_us(150);
+        Timer::after_micros(150).await;
 
         let mut buf = [0u8; 3];
         self.i2c
-            .read(0x55 | 1, &mut buf)
+            .read(0x55, &mut buf)
             .with_anyhow("Unable to read soil data")?;
 
         let d0 = buf[0];
         let d1 = buf[1];
         let d2 = buf[2];
-
-        info!("d0: {}, d1: {}, d2: {}", d0, d1, d2);
 
         let pf = d0 as f32 + (d1 as f32 * 256.0) + (d2 as f32 / 256.0);
         

@@ -34,38 +34,39 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
     pub async fn sample(&mut self) -> anyhow::Result<Measurement> {
         self.pcb_pwr.set_high();
 
-        Timer::after_millis(300).await;
+        Timer::after_millis(100).await;
+
+        let mut delay = Delay;
 
         let mut i2c_pcb_sht = RefCellDevice::new(&self.i2c_pcb);
         let mut i2c_pcb_bh1730fvc = RefCellDevice::new(&self.i2c_pcb);
-        let mut i2c_pcb_moisture = RefCellDevice::new(&self.i2c_ext);
+        let mut i2c_ext_moisture = RefCellDevice::new(&self.i2c_ext);
 
-        let mut soil = SoilSensor::new(&mut i2c_pcb_moisture);
+        let mut soil = SoilSensor::new(&mut i2c_ext_moisture);
 
         let _ = soil.start().with_anyhow("Failed to start reading soil");
 
+        Timer::after_millis(15).await;
+
+        let soil_pf = soil.read().await.with_anyhow("Unable to read soil")?;
+
         let mut sht = shtcx::blocking::shtc3(RefCellDevice::new(&self.i2c_pcb));
-        let mut delay = Delay;
+        
         let mut bh1730fvc = BH1730FVC::new(&mut delay, &mut i2c_pcb_bh1730fvc)
             .with_anyhow("BH1730FVC init failed")?;
         
         sht.start_measurement(shtcx::blocking::PowerMode::NormalMode)
             .with_anyhow("SHT start measurement failed")?;
+
         bh1730fvc.set_mode(bh1730fvc::Mode::SingleShot, &mut i2c_pcb_bh1730fvc)
             .with_anyhow("BH1730FVC set mode failed")?;
 
-        Timer::after_millis(300).await;
+        Timer::after_millis(150).await;
 
         let lux = bh1730fvc.read_ambient_light_intensity(&mut i2c_pcb_sht).with_anyhow("BH1730FVC read failed")?;
         let battery = self.bm.sample();
         
-        Timer::after_millis(300).await;
         let measurement = sht.get_measurement_result().with_anyhow("SHT read failed")?;
-
-        // let soil_pf = measure_soil(&mut i2c_pcb_moisture, &mut delay)?;
-
-        let soil_pf = soil.read(&mut delay).with_anyhow("Unable to read soil")?;
-
 
         self.pcb_pwr.set_low();
 
