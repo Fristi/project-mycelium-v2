@@ -2,6 +2,8 @@ use embassy_time::Timer;
 use embedded_hal::{i2c::{I2c, SevenBitAddress}};
 use crate::anyhow_utils::*;
 
+const ADDR: u8 = 0x55;
+
 /// Soil sensor state
 pub struct SoilSensor<I2C> {
     i2c: I2C
@@ -19,7 +21,7 @@ impl<I2C> SoilSensor<I2C> {
         I2C: I2c<SevenBitAddress>
     {
         self.i2c
-            .write(0x55, &[0x10 | 0x01, 0x01])
+            .write(ADDR, &[0x10 | 0x01, 0x01])
             .with_anyhow("Unable to start soil conversion")?;
 
         Ok(())
@@ -30,14 +32,14 @@ impl<I2C> SoilSensor<I2C> {
         I2C: I2c<SevenBitAddress>
     {
         self.i2c
-            .write(0x55, &[0x10 | 0x02])
+            .write(ADDR, &[0x10 | 0x02])
             .with_anyhow("Unable to trigger soil read")?;
 
         Timer::after_micros(150).await;
 
         let mut buf = [0u8; 3];
         self.i2c
-            .read(0x55, &mut buf)
+            .read(ADDR, &mut buf)
             .with_anyhow("Unable to read soil data")?;
 
         let d0 = buf[0];
