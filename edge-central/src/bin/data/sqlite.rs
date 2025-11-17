@@ -15,6 +15,7 @@ pub struct MeasurementSerieEntryRow {
     pub lux: f64,
     pub temperature: f64,
     pub humidity: f64,
+    pub soil_pf: f64
 }
 
 impl MeasurementSerieEntryRow {
@@ -31,6 +32,7 @@ impl MeasurementSerieEntryRow {
             lux: entry.measurement.lux as f64,
             temperature: entry.measurement.temperature as f64,
             humidity: entry.measurement.humidity as f64,
+            soil_pf: entry.measurement.soil_pf as f64
         }
     }
 
@@ -42,6 +44,7 @@ impl MeasurementSerieEntryRow {
                 lux: self.lux as f32,
                 temperature: self.temperature as f32,
                 humidity: self.humidity as f32,
+                soil_pf: self.soil_pf as f32
             },
         }
     }

@@ -5,9 +5,10 @@ pub mod ble;
 pub mod battery;
 pub mod gauge;
 pub mod types;
+pub mod moisture;
+pub mod anyhow_utils;
 
 use core::cell::RefCell;
-
 use bt_hci::controller::ExternalController;
 use chrono::NaiveDateTime;
 use edge_protocol::{Measurement, MeasurementSerieEntry};
@@ -15,7 +16,7 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Timer};
 use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_hal::gpio::{GpioPin, Output, OutputConfig};
-use defmt::{error, info, flush};
+use defmt::{error, flush, info};
 use embassy_executor::Spawner;
 use esp_hal::i2c::master::BusTimeout;
 use esp_hal::ram;
@@ -30,7 +31,7 @@ use esp_hal::{clock::CpuClock, time::Rate};
 use esp_wifi::ble::controller::BleConnector;
 use esp_wifi::{init, EspWifiController};
 use gauge::Gauge;
-use esp_println::{self as _, println};
+use esp_println::{self as _};
 use heapless::Vec;
 use timeseries::Series;
 
@@ -46,30 +47,34 @@ static mut STATE: DeviceState = DeviceState::AwaitingTimeSync;
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    
-    let mut state = unsafe { &STATE };
-    let mut boot_args = DeviceBootArgs::boot(&state);
 
     let mut cfg = RtcSleepConfig::deep();
     cfg.set_rtc_fastmem_pd_en(false);
-    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10 * 60));
+    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(1 * 10));
+    let state = unsafe { &STATE };
+    let boot_args = DeviceBootArgs::boot(&state);
     
     match boot_args {
         DeviceBootArgs::AwaitingTimeSync { mut rtc, mac, ble } => {
             
             info!("Awaiting time sync");
 
-            ble::run(ble, &mut rtc, mac.clone(), Vec::new()).await;
+            let future = select(
+                ble::run(ble, &mut rtc, mac.clone(), Vec::new()),
+                Timer::after(Duration::from_secs(10))
+            );
 
-            info!("Awaiting time sync: done");
-
-            unsafe {
-                let series: Measurements = Series::new(Measurement::MAX_DEVIATION);
-                let new_state = DeviceState::Buffering(series);
-                STATE = new_state;
-            }
-            
-            info!("Sleeping");
+            match future.await {
+                Either::First(_) => {
+                    info!("Awaiting time sync: done");
+                    unsafe {
+                        let series: Measurements = Series::new(Measurement::MAX_DEVIATION);
+                        let new_state = DeviceState::Buffering(series);
+                        STATE = new_state;
+                    }
+                },
+                Either::Second(_) => {}
+            };
 
             rtc.sleep(&cfg, &[&wakeup_source]);
         }
@@ -80,7 +85,6 @@ async fn main(_spawner: Spawner) {
 
             match measurement {
                 Ok(m) => {
-                    info!("battery: {}, lux: {}, temperature: {}, humidity: {}", m.battery, m.lux, m.temperature, m.humidity);
                     let mut new_measurements = (*measurements).clone();
                     
                     new_measurements.append_monotonic(rtc.current_time(), m);
@@ -95,9 +99,7 @@ async fn main(_spawner: Spawner) {
                         STATE = new_state;
                     }
                 },
-                Err(err) => {
-                    error!("Error while measuring")
-                }
+                Err(_) => {}
             };
 
             rtc.sleep(&cfg, &[&wakeup_source]);
@@ -128,15 +130,10 @@ async fn main(_spawner: Spawner) {
                                 STATE = DeviceState::Buffering(new_measurements);
                             }
                         },
-                        Err(_err) => {
-                            error!("Error while measuring")  
-                        }
+                        Err(_) => {}
                     }
-                    info!("Sleeping");
                 },
-                Either::Second(_) => {
-                    info!("Timed out ...")
-                }
+                Either::Second(_) => {}
             };
         
 
@@ -145,14 +142,6 @@ async fn main(_spawner: Spawner) {
     };
 }
 
-fn random_measurement(rng: &mut Rng) -> Measurement {
-    Measurement {
-        battery: (rng.random() % 101) as u8,
-        lux: (rng.random() % 100001) as f32,
-        temperature: (rng.random() % 46) as f32,
-        humidity: (rng.random() % 101) as f32
-    }
-}
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
@@ -231,22 +220,38 @@ impl <'a> DeviceBootArgs<'a> {
                 let mut adc_config = AdcConfig::new();
                 let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
                 let adc = Adc::new(peripherals.ADC1, adc_config);
-                let output_config = OutputConfig::default();
+                let output_config_pcb = OutputConfig::default();
             
-                let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config);
-                let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config);
-                let mut pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config);
+                let i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config_pcb);
+                let i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config_pcb);
+                let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
                 
-                let mut i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                let i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
                     peripherals.I2C0,
                     esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
                 )
                 .expect("I2c init failed")
                 .with_sda(i2c_pcb_sda)
                 .with_scl(i2c_pcb_scl));
+
+                
+                let output_config_ext = OutputConfig::default()
+                    .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
+                    .with_pull(esp_hal::gpio::Pull::Up);
+
+                let i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::Low, output_config_ext);
+                let i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::Low, output_config_ext);
+
+                let i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                    peripherals.I2C1,
+                    esp_hal::i2c::master::Config::default()
+                )
+                .expect("I2c init failed")
+                .with_sda(i2c_ext_sda)
+                .with_scl(i2c_ext_scl));
             
                 let battery = BatteryMeasurement::new(adc, pin);
-                let gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
+                let gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
 
 
                 Self::Buffering { rtc, gauge, measurements, rng }
@@ -272,22 +277,38 @@ impl <'a> DeviceBootArgs<'a> {
                 let mut adc_config = AdcConfig::new();
                 let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
                 let adc = Adc::new(peripherals.ADC1, adc_config);
-                let output_config = OutputConfig::default();
+                let output_config_pcb = OutputConfig::default();
             
-                let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config);
-                let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config);
-                let mut pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config);
+                let i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config_pcb);
+                let i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config_pcb);
+                let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
                 
-                let mut i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                let i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
                     peripherals.I2C0,
                     esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
                 )
                 .expect("I2c init failed")
                 .with_sda(i2c_pcb_sda)
                 .with_scl(i2c_pcb_scl));
+
+                
+                let output_config_ext = OutputConfig::default()
+                    .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
+                    .with_pull(esp_hal::gpio::Pull::Up);
+
+                let i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::Low, output_config_ext);
+                let i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::Low, output_config_ext);
+
+                let i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                    peripherals.I2C1,
+                    esp_hal::i2c::master::Config::default()
+                )
+                .expect("I2c init failed")
+                .with_sda(i2c_ext_sda)
+                .with_scl(i2c_ext_scl));
             
                 let battery = BatteryMeasurement::new(adc, pin);
-                let mut gauge = Gauge::new(i2c_pcb_refcell, pcb_pwr, battery);
+                let gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
 
                 Self::Flush { rtc, mac, gauge, measurements, ble: controller, rng }
             }

@@ -1,6 +1,6 @@
 [target.xtensa-esp32-none-elf]
 # runner = "espflash flash --monitor --chip esp32 --flash-freq 40mhz --flash-mode dio --port /dev/tty.usbserial-54350025201 --log-format defmt"
-runner = "espflash flash --monitor --chip esp32 --flash-freq 40mhz --flash-size 4mb --flash-mode dio --port /dev/tty.usbserial-21303 --log-format defmt"
+runner = "espflash flash --monitor --chip esp32 --flash-freq 40mhz --flash-size 4mb --flash-mode dio --port /dev/tty.usbserial-11103 --log-format defmt"
 
 [env]
 DEFMT_LOG="info"

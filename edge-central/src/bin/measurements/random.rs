@@ -57,5 +57,6 @@ fn random_measurement<T: Rng>(rng: &mut T) -> Measurement {
         lux: (rng.random::<u32>() % 100001) as f32,
         temperature: (rng.random::<u32>() % 46) as f32,
         humidity: (rng.random::<u32>() % 101) as f32,
+        soil_pf: (rng.random::<u32>() % 450) as f32,
     }
 }
