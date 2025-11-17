@@ -24,8 +24,8 @@ struct SyncUnsafeCell<T>(UnsafeCell<T>);
 
 unsafe impl<T> Sync for SyncUnsafeCell<T> {}
 
-static GATT_BUFFER: SyncUnsafeCell<[u8; 198]> =
-    SyncUnsafeCell(UnsafeCell::new([0; 198]));
+static GATT_BUFFER: SyncUnsafeCell<[u8; 234]> =
+    SyncUnsafeCell(UnsafeCell::new([0; 234]));
 
 
 pub struct MeasurementSeries(MeasurementSerieEntryVec);
@@ -42,14 +42,14 @@ impl AsGatt for MeasurementSeries {
         let buffer = unsafe { &mut *GATT_BUFFER.0.get() };
 
         for (i, item) in self.0.iter().enumerate() {
-            buffer[i * 33..(i + 1) * 33].copy_from_slice(&item.to_tlv());
+            buffer[i * 39..(i + 1) * 39].copy_from_slice(&item.to_tlv());
         }
 
-        unsafe { core::slice::from_raw_parts(buffer.as_ptr(), 198) }
+        unsafe { core::slice::from_raw_parts(buffer.as_ptr(), 234) }
 
     }
-    const MIN_SIZE: usize = 198;
-    const MAX_SIZE: usize = 198;
+    const MIN_SIZE: usize = 234;
+    const MAX_SIZE: usize = 234;
 }
 
 impl FromGatt for MeasurementSeries {

@@ -1,5 +1,4 @@
 use chrono::NaiveDateTime;
-use heapless::Vec;
 use edge_protocol::{Measurement};
 use timeseries::Series;
 

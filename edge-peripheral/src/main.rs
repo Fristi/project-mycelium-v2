@@ -50,7 +50,7 @@ async fn main(_spawner: Spawner) {
 
     let mut cfg = RtcSleepConfig::deep();
     cfg.set_rtc_fastmem_pd_en(false);
-    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10 * 60));
+    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(1 * 10));
     let state = unsafe { &STATE };
     let boot_args = DeviceBootArgs::boot(&state);
     
