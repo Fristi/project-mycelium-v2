@@ -9,8 +9,6 @@ pub mod moisture;
 pub mod anyhow_utils;
 
 use core::cell::RefCell;
-
-use bt_hci::cmd::info;
 use bt_hci::controller::ExternalController;
 use chrono::NaiveDateTime;
 use edge_protocol::{Measurement, MeasurementSerieEntry};
@@ -18,7 +16,7 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Timer};
 use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_hal::gpio::{GpioPin, Output, OutputConfig};
-use defmt::{Debug2Format, error, flush, info};
+use defmt::{error, flush, info};
 use embassy_executor::Spawner;
 use esp_hal::i2c::master::BusTimeout;
 use esp_hal::ram;
@@ -33,7 +31,7 @@ use esp_hal::{clock::CpuClock, time::Rate};
 use esp_wifi::ble::controller::BleConnector;
 use esp_wifi::{init, EspWifiController};
 use gauge::Gauge;
-use esp_println::{self as _, println};
+use esp_println::{self as _};
 use heapless::Vec;
 use timeseries::Series;
 
@@ -49,122 +47,99 @@ static mut STATE: DeviceState = DeviceState::AwaitingTimeSync;
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
-    
-    // let mut state = unsafe { &STATE };
-    let state = DeviceState::Buffering(Series::new(Measurement::MAX_DEVIATION));
-    let mut boot_args = DeviceBootArgs::boot(&state);
 
+    let mut cfg = RtcSleepConfig::deep();
+    cfg.set_rtc_fastmem_pd_en(false);
+    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10 * 60));
+    let state = unsafe { &STATE };
+    let boot_args = DeviceBootArgs::boot(&state);
+    
     match boot_args {
-        DeviceBootArgs::Buffering { rtc, mut gauge, measurements, rng } => {
-            loop {
-                match gauge.sample().await {
-                    Ok(res) => {
-                        info!("Measurement {:?} pF {:?} % {:?} lx {:?} C {:?} RH %", res.soil_pf, res.battery, res.lux, res.temperature, res.humidity)
-                    },
-                    Err(err) => {
-                        info!("Error occured! {:?}", Debug2Format(&err))
+        DeviceBootArgs::AwaitingTimeSync { mut rtc, mac, ble } => {
+            
+            info!("Awaiting time sync");
+
+            let future = select(
+                ble::run(ble, &mut rtc, mac.clone(), Vec::new()),
+                Timer::after(Duration::from_secs(10))
+            );
+
+            match future.await {
+                Either::First(_) => {
+                    info!("Awaiting time sync: done");
+                    unsafe {
+                        let series: Measurements = Series::new(Measurement::MAX_DEVIATION);
+                        let new_state = DeviceState::Buffering(series);
+                        STATE = new_state;
                     }
-                };
+                },
+                Either::Second(_) => {}
+            };
 
-                Timer::after_secs(1).await
-            }
-        }, 
-        _ => info!("Should not happen")
-    }
+            rtc.sleep(&cfg, &[&wakeup_source]);
+        }
+        DeviceBootArgs::Buffering { mut rtc, mut gauge, measurements, mut rng } => {
+            info!("Buffering, current num entries {0}", measurements.buckets.len());
 
-    // let mut cfg = RtcSleepConfig::deep();
-    // cfg.set_rtc_fastmem_pd_en(false);
-    // let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(10 * 60));
-    
-    // match boot_args {
-    //     DeviceBootArgs::AwaitingTimeSync { mut rtc, mac, ble } => {
-            
-    //         info!("Awaiting time sync");
+            let measurement = gauge.sample().await;
 
-    //         ble::run(ble, &mut rtc, mac.clone(), Vec::new()).await;
-
-    //         info!("Awaiting time sync: done");
-
-    //         unsafe {
-    //             let series: Measurements = Series::new(Measurement::MAX_DEVIATION);
-    //             let new_state = DeviceState::Buffering(series);
-    //             STATE = new_state;
-    //         }
-            
-    //         info!("Sleeping");
-
-    //         rtc.sleep(&cfg, &[&wakeup_source]);
-    //     }
-    //     DeviceBootArgs::Buffering { mut rtc, mut gauge, measurements, mut rng } => {
-    //         info!("Buffering, current num entries {0}", measurements.buckets.len());
-
-    //         let measurement = gauge.sample().await;
-
-    //         match measurement {
-    //             Ok(m) => {
-    //                 info!("battery: {}, lux: {}, temperature: {}, humidity: {}", m.battery, m.lux, m.temperature, m.humidity);
-    //                 let mut new_measurements = (*measurements).clone();
+            match measurement {
+                Ok(m) => {
+                    let mut new_measurements = (*measurements).clone();
                     
-    //                 new_measurements.append_monotonic(rtc.current_time(), m);
+                    new_measurements.append_monotonic(rtc.current_time(), m);
 
-    //                 let new_state = if new_measurements.is_full() {
-    //                     DeviceState::Flush(new_measurements)
-    //                 } else {  
-    //                     DeviceState::Buffering(new_measurements)
-    //                 };
+                    let new_state = if new_measurements.is_full() {
+                        DeviceState::Flush(new_measurements)
+                    } else {  
+                        DeviceState::Buffering(new_measurements)
+                    };
 
-    //                 unsafe {
-    //                     STATE = new_state;
-    //                 }
-    //             },
-    //             Err(err) => {
-    //                 error!("Error while measuring")
-    //             }
-    //         };
+                    unsafe {
+                        STATE = new_state;
+                    }
+                },
+                Err(_) => {}
+            };
 
-    //         rtc.sleep(&cfg, &[&wakeup_source]);
-    //     }
-    //     DeviceBootArgs::Flush { mut rtc, mac, mut gauge, measurements, ble, mut rng } => {
-    //         info!("Flushing");
+            rtc.sleep(&cfg, &[&wakeup_source]);
+        }
+        DeviceBootArgs::Flush { mut rtc, mac, mut gauge, measurements, ble, mut rng } => {
+            info!("Flushing");
 
-    //         let entries: Vec<MeasurementSerieEntry, 6> = measurements
-    //             .buckets
-    //             .iter()
-    //             .map(|entry| MeasurementSerieEntry { timestamp: entry.range.start, measurement: entry.value })
-    //             .collect();
+            let entries: Vec<MeasurementSerieEntry, 6> = measurements
+                .buckets
+                .iter()
+                .map(|entry| MeasurementSerieEntry { timestamp: entry.range.start, measurement: entry.value })
+                .collect();
             
-    //         let future = select(
-    //             ble::run(ble, &mut rtc, mac.clone(), entries),
-    //             Timer::after(Duration::from_secs(10))
-    //         );
+            let future = select(
+                ble::run(ble, &mut rtc, mac.clone(), entries),
+                Timer::after(Duration::from_secs(10))
+            );
 
-    //         match future.await {
-    //             Either::First(_) => {
-    //                 match gauge.sample().await {
-    //                     Ok(m) => {
-    //                         let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
+            match future.await {
+                Either::First(_) => {
+                    match gauge.sample().await {
+                        Ok(m) => {
+                            let mut new_measurements: Measurements = Series::new(Measurement::MAX_DEVIATION);
 
-    //                         new_measurements.append_monotonic(rtc.current_time(), m);
+                            new_measurements.append_monotonic(rtc.current_time(), m);
 
-    //                         unsafe {
-    //                             STATE = DeviceState::Buffering(new_measurements);
-    //                         }
-    //                     },
-    //                     Err(_err) => {
-    //                         error!("Error while measuring")  
-    //                     }
-    //                 }
-    //                 info!("Sleeping");
-    //             },
-    //             Either::Second(_) => {
-    //                 info!("Timed out ...")
-    //             }
-    //         };
+                            unsafe {
+                                STATE = DeviceState::Buffering(new_measurements);
+                            }
+                        },
+                        Err(_) => {}
+                    }
+                },
+                Either::Second(_) => {}
+            };
         
 
-    //         rtc.sleep(&cfg, &[&wakeup_source]);
-    //     }
-    // };
+            rtc.sleep(&cfg, &[&wakeup_source]);
+        }
+    };
 }
 
 
@@ -302,37 +277,38 @@ impl <'a> DeviceBootArgs<'a> {
                 let mut adc_config = AdcConfig::new();
                 let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
                 let adc = Adc::new(peripherals.ADC1, adc_config);
-                let output_config = OutputConfig::default();
+                let output_config_pcb = OutputConfig::default();
             
-                let mut i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config);
-                let mut i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config);
-                let mut pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config);
-
-                let i2c = esp_hal::i2c::master::I2c::new(
+                let i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config_pcb);
+                let i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config_pcb);
+                let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
+                
+                let i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
                     peripherals.I2C0,
                     esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
                 )
                 .expect("I2c init failed")
                 .with_sda(i2c_pcb_sda)
-                .with_scl(i2c_pcb_scl);
-                
-                let mut i2c_pcb_refcell = RefCell::new(i2c);
-
-                let mut i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::High, output_config);
-                let mut i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::High, output_config);
+                .with_scl(i2c_pcb_scl));
 
                 
-                let mut i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
+                let output_config_ext = OutputConfig::default()
+                    .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
+                    .with_pull(esp_hal::gpio::Pull::Up);
+
+                let i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::Low, output_config_ext);
+                let i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::Low, output_config_ext);
+
+                let i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
                     peripherals.I2C1,
-                    esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
+                    esp_hal::i2c::master::Config::default()
                 )
                 .expect("I2c init failed")
                 .with_sda(i2c_ext_sda)
                 .with_scl(i2c_ext_scl));
-                
             
                 let battery = BatteryMeasurement::new(adc, pin);
-                let mut gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr,battery);
+                let gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
 
                 Self::Flush { rtc, mac, gauge, measurements, ble: controller, rng }
             }
