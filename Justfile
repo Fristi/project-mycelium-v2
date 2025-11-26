@@ -1,6 +1,6 @@
 sbc_user := env("SBC_USER", "root")
 sbc_pwd := env("SBC_PWD", "mAxsuw-1sizhe-tojvew")
-sbc_host := env("SBC_HOST", "192.168.1.33")
+sbc_host := env("SBC_HOST", "192.168.1.101")
 
 [doc('Execute central')]
 central-exec:

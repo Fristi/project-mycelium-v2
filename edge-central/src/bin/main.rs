@@ -8,7 +8,7 @@ pub mod status;
 use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
 use anyhow::Ok;
-use chrono::TimeDelta;
+use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
 use dotenv::dotenv;
 use edge_client_backend::{apis::configuration::{Configuration}, models::{StationInsert, StationMeasurement}};
 use futures::{stream, StreamExt};
@@ -26,7 +26,7 @@ use crate::{
         random::RandomPeripheralSyncResultStreamProvider,
         types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider},
     },
-    onboarding::{local::LocalOnboarding, types::Onboarding}, status::Status,
+    onboarding::{local::LocalOnboarding, types::Onboarding}, status::{Status, StatusSummary},
 };
 
 #[tokio::main]
@@ -34,7 +34,6 @@ async fn main() {
     // Install a subscriber that logs to stdout with TRACE level enabled
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::TRACE) // allow trace level logs
-        
         .init();
 
     if let Err(e) = work().await {
@@ -46,19 +45,21 @@ async fn main() {
 
 
 async fn work() -> anyhow::Result<()> {
+
     // dotenv()?;
 
-    // let mut status1 = status::i2c::I2cStatus::new("/dev/i2c-0")?;
-    // let mut status2 = status::i2c::I2cStatus::new("/dev/i2c-1")?;
-    // let mut status3 = status::i2c::I2cStatus::new("/dev/i2c-2")?;
-    let mut status4 = status::i2c::I2cStatus::new("/dev/i2c-3")?;
-    // let mut status5 = status::i2c::I2cStatus::new("/dev/i2c-4")?;
+    let mut s = status::i2c::I2cStatus::new("/dev/i2c-3")?;
 
-    // status1.show("Hallo from i2c-0")?;
-    // status2.show("Hallo from i2c-1")?;
-    // status3.show("Hallo from i2c-2")?;
-    status4.show("from edge-central", "Hello")?;
-    // status5.show("Hallo from i2c-4")?;
+    let summary = StatusSummary {
+        from: DateTime::from_naive_utc_and_offset(NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_opt(12, 0, 0).unwrap(), Utc),
+        till: DateTime::from_naive_utc_and_offset(NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_opt(13, 0, 0).unwrap(), Utc),
+        temperature: 22.0,
+        humidity: 40.0,
+        soil_moisture: 30.0,
+        light: 100.0
+    };
+
+    s.show(&summary);
 
     let app_config = cfg::AppConfig::from_env()?;
     let opts = SqliteConnectOptions::from_str(&app_config.database_url)?
@@ -124,7 +125,8 @@ async fn work() -> anyhow::Result<()> {
 
     stream
         .for_each(|m| async {
-            if let Err(err) = sync_measurements(&configuration, m).await {
+            let mut status = status::i2c::I2cStatus::new("/dev/i2c-3").unwrap();
+            if let Err(err) = sync_measurements(&configuration, m, &mut status).await {
                 tracing::error!("Failed to sync measurements {}", err);
             }
         })
@@ -133,7 +135,7 @@ async fn work() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult) -> anyhow::Result<()> {
+async fn sync_measurements<S : Status>(configuration: &Configuration, m: PeripheralSyncResult, status: &mut S) -> anyhow::Result<()> {
 
     let mac = format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]);
 
@@ -141,6 +143,7 @@ async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResul
 
     let id = edge_client_backend::apis::default_api::add_station(&configuration, station_insert).await?;
     let mut measurements = vec![];
+    let summary = StatusSummary::from_measurements(&m.measurements);
 
     for measurement in m.measurements {
         measurements.push(StationMeasurement {
@@ -149,12 +152,17 @@ async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResul
             temperature: measurement.measurement.temperature as f64,
             humidity: measurement.measurement.humidity as f64,
             lux: measurement.measurement.lux as f64,
-            soil_pf: 0_f64,
+            soil_pf: measurement.measurement.soil_pf as f64,
             tank_pf: 0_f64
         });
     }
 
     edge_client_backend::apis::default_api::checkin_station(&configuration, id.to_string().as_str(), Some(measurements)).await?;
+
+    match summary {
+        Some(m) => status.show(&m)?,
+        None => ()
+    }
 
     Ok(())            
 }

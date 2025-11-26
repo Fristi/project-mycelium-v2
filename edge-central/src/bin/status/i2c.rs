@@ -1,8 +1,7 @@
-use crate::status::Status;
+use crate::status::{Status, StatusSummary};
 use embedded_graphics::{
     mono_font::{
-        ascii::{FONT_6X10, FONT_9X18_BOLD},
-        MonoTextStyleBuilder,
+        MonoTextStyle, MonoTextStyleBuilder, ascii::{FONT_6X10, FONT_9X18_BOLD}
     },
     pixelcolor::BinaryColor,
     prelude::*,
@@ -36,39 +35,33 @@ impl I2cStatus {
 
 impl Status for I2cStatus {
 
-    fn show(&mut self, small_text: &str, big_text: &str) -> Result<()> {
-        // Specify different text styles
-        let text_style = MonoTextStyleBuilder::new()
-            .font(&FONT_6X10)
-            .text_color(BinaryColor::On)
-            .build();
-        let text_style_big = MonoTextStyleBuilder::new()
-            .font(&FONT_9X18_BOLD)
-            .text_color(BinaryColor::On)
-            .build();
+    fn show(&mut self, status: &StatusSummary) -> Result<()> {
+        let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
 
-        // Fill display bufffer with a centered text with two lines (and two text
-        // styles)
-        Text::with_alignment(
-            big_text,
-            self.display.bounding_box().center() + Point::new(0, 0),
-            text_style_big,
-            Alignment::Center,
-        )
-        .draw(&mut self.display)
-        .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
+        // --- First row: time range header ---
+        let from_str = status.from.format("%H:%M").to_string();
+        let till_str = status.till.format("%H:%M").to_string();
+        let header = format!("{} till {}", from_str, till_str);
 
-        Text::with_alignment(
-            small_text,
-            self.display.bounding_box().center() + Point::new(0, 14),
-            text_style,
-            Alignment::Center,
-        )
-        .draw(&mut self.display)
-        .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
+        Text::with_alignment(&header, Point::new(64, 8), style, Alignment::Center)
+            .draw(&mut self.display).map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
 
-        // Write buffer to display
-        self.display.flush().map_err(|e| anyhow::anyhow!("Unable to flush display: {:?}", e))?;
+        // --- Sensor rows ---
+        let lines = [
+            format!("Temp      {:.1} C", status.temperature),
+            format!("Humidity  {:.1} RH", status.humidity),
+            format!("Soil      {:.1} pF", status.soil_moisture),
+            format!("Light     {:.0} lx", status.light),
+        ];
+
+        let mut y = 20;
+        for line in lines {
+            Text::new(&line, Point::new(0, y), style)
+                .draw(&mut self.display)
+                .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
+
+            y += 10; // Line spacing
+        }
         // Clear display buffer
         self.display.clear(BinaryColor::On).map_err(|e| anyhow::anyhow!("Unable to clear display: {:?}", e))?;
 
