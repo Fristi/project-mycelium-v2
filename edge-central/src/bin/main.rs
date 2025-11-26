@@ -3,6 +3,7 @@ pub mod cfg;
 pub mod data;
 pub mod measurements;
 pub mod onboarding;
+pub mod status;
 
 use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
@@ -19,15 +20,13 @@ use std::{str::FromStr, sync::Arc};
 
 use crate::{
     cfg::{AppConfig, OnboardingStrategy, PeripheralSyncMode},
-    data::sqlite::{
-        SqliteEdgeStateRepository,
-    },
+    data::sqlite::SqliteEdgeStateRepository,
     measurements::{
         btleplug::BtleplugPeripheralSyncResultStreamProvider,
         random::RandomPeripheralSyncResultStreamProvider,
         types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider},
     },
-    onboarding::{local::LocalOnboarding, types::Onboarding},
+    onboarding::{local::LocalOnboarding, types::Onboarding}, status::Status,
 };
 
 #[tokio::main]
@@ -35,6 +34,7 @@ async fn main() {
     // Install a subscriber that logs to stdout with TRACE level enabled
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::TRACE) // allow trace level logs
+        
         .init();
 
     if let Err(e) = work().await {
@@ -44,10 +44,21 @@ async fn main() {
 }
 
 
+
 async fn work() -> anyhow::Result<()> {
-    dotenv()?;
+    // dotenv()?;
 
+    // let mut status1 = status::i2c::I2cStatus::new("/dev/i2c-0")?;
+    // let mut status2 = status::i2c::I2cStatus::new("/dev/i2c-1")?;
+    // let mut status3 = status::i2c::I2cStatus::new("/dev/i2c-2")?;
+    let mut status4 = status::i2c::I2cStatus::new("/dev/i2c-3")?;
+    // let mut status5 = status::i2c::I2cStatus::new("/dev/i2c-4")?;
 
+    // status1.show("Hallo from i2c-0")?;
+    // status2.show("Hallo from i2c-1")?;
+    // status3.show("Hallo from i2c-2")?;
+    status4.show("from edge-central", "Hello")?;
+    // status5.show("Hallo from i2c-4")?;
 
     let app_config = cfg::AppConfig::from_env()?;
     let opts = SqliteConnectOptions::from_str(&app_config.database_url)?
