@@ -1,7 +1,7 @@
 use crate::status::{Status, StatusSummary};
 use embedded_graphics::{
     mono_font::{
-        MonoTextStyle, MonoTextStyleBuilder, ascii::{FONT_6X10, FONT_9X18_BOLD}
+        MonoTextStyle, MonoTextStyleBuilder, ascii::{FONT_5X7}
     },
     pixelcolor::BinaryColor,
     prelude::*,
@@ -36,7 +36,7 @@ impl I2cStatus {
 impl Status for I2cStatus {
 
     fn show(&mut self, status: &StatusSummary) -> Result<()> {
-        let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
+        let style = MonoTextStyle::new(&FONT_5X7, BinaryColor::On);
 
         // --- First row: time range header ---
         let from_str = status.from.format("%H:%M").to_string();
@@ -48,10 +48,8 @@ impl Status for I2cStatus {
 
         // --- Sensor rows ---
         let lines = [
-            format!("Temp      {:.1} C", status.temperature),
-            format!("Humidity  {:.1} RH", status.humidity),
-            format!("Soil      {:.1} pF", status.soil_moisture),
-            format!("Light     {:.0} lx", status.light),
+            format!("T {:.0} C  | S {:.0} pF", status.temperature, status.soil_moisture),
+            format!("H {:.0} RH | L {:.0} lx", status.humidity, status.light)
         ];
 
         let mut y = 20;
@@ -62,8 +60,8 @@ impl Status for I2cStatus {
 
             y += 10; // Line spacing
         }
-        // Clear display buffer
-        self.display.clear(BinaryColor::On).map_err(|e| anyhow::anyhow!("Unable to clear display: {:?}", e))?;
+
+        self.display.flush().map_err(|e| anyhow::anyhow!("Unable to flush display: {:?}", e))?;
 
         Ok(())
     }
