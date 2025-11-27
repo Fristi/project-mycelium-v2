@@ -1,6 +1,33 @@
 edge-central
 ---
 
+### Builing Linux AARCH64
+
+Since we use an Orange Pi Zero 2W we need to build for an AARCH64 processor. Also we installed DietPi on it, so to speed up the dev cycle have the following installed
+
+```
+brew tap messense/macos-cross-toolchains
+brew reinstall aarch64-unknown-linux-musl
+```
+
+To run an the build:
+
+```
+cargo build --target aarch64-unknown-linux-musl
+```
+
+or
+
+```
+just central-build
+```
+
+and to roll-out on the pi directly
+
+```
+just central-build-roll
+```
+
 
 ### Orange Pi Zero 2W
 To run edge-central on a OrangePi you can use the `DietPi_OrangePiZero2W-ARMv8-Trixie` distribution

@@ -15,14 +15,13 @@ use futures::{stream, StreamExt};
 use reqwest::{Client, Request, Url};
 use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
+use sqlx::{any, sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool}};
 use std::{str::FromStr, sync::Arc};
 
 use crate::{
     cfg::{AppConfig, OnboardingStrategy, PeripheralSyncMode},
     data::sqlite::SqliteEdgeStateRepository,
     measurements::{
-        btleplug::BtleplugPeripheralSyncResultStreamProvider,
         random::RandomPeripheralSyncResultStreamProvider,
         types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider},
     },
@@ -172,8 +171,7 @@ async fn make_peripheral_sync_stream_provider(
 ) -> anyhow::Result<Box<dyn PeripheralSyncResultStreamProvider>> {
     match mode {
         PeripheralSyncMode::Ble => {
-            let provider = BtleplugPeripheralSyncResultStreamProvider::new().await?;
-            Ok(Box::new(provider))
+            anyhow::bail!("Not implemented")
         }
         PeripheralSyncMode::Random => {
             let provider = RandomPeripheralSyncResultStreamProvider::new(
