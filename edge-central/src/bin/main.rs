@@ -135,12 +135,12 @@ async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResul
         });
     }
 
-    let mut status = make_status()?;
-
     edge_client_backend::apis::default_api::checkin_station(&configuration, id.to_string().as_str(), Some(measurements)).await?;
-
     match summary {
-        Some(m) => status.show(&m)?,
+        Some(m) => {
+            let mut status = make_status()?;
+            status.show(&m)?
+        },
         None => ()
     }
 
