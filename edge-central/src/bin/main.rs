@@ -7,8 +7,7 @@ pub mod status;
 
 use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
-use anyhow::Ok;
-use chrono::TimeDelta;
+use anyhow::*;
 use dotenv::dotenv;
 use edge_client_backend::{apis::configuration::{Configuration}, models::{StationInsert, StationMeasurement}};
 use futures::{stream, StreamExt};
@@ -17,15 +16,13 @@ use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc};
-use crate::{
-    cfg::{AppConfig, OnboardingStrategy, PeripheralSyncMode},
-    data::sqlite::SqliteEdgeStateRepository,
-    measurements::{
-        random::RandomPeripheralSyncResultStreamProvider,
-        types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider},
-    },
-    onboarding::{local::LocalOnboarding, types::Onboarding}, status::{Status, StatusSummary},
-};
+use crate::measurements::types::PeripheralSyncResult;
+use crate::data::sqlite::SqliteEdgeStateRepository;
+use crate::cfg::AppConfig;
+use crate::status::StatusSummary;
+use crate::measurements::make_peripheral_sync_stream_provider;
+use crate::onboarding::make_onboarding;
+use crate::status::make_status;
 
 #[tokio::main]
 async fn main() {
@@ -148,62 +145,6 @@ async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResul
     }
 
     Ok(())            
-}
-
-async fn make_peripheral_sync_stream_provider(
-    mode: &PeripheralSyncMode,
-) -> anyhow::Result<Box<dyn PeripheralSyncResultStreamProvider>> {
-    match mode {
-        PeripheralSyncMode::Ble => {
-            {
-                #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-                {
-                    let provider = crate::measurements::btleplug::BtleplugPeripheralSyncResultStreamProvider::new().await?;
-
-                    Ok(Box::new(provider))
-                }
-
-                #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-                {
-                    todo!("Not implemented")
-                }
-            }
-
-        }
-        PeripheralSyncMode::Random => {
-            let provider = RandomPeripheralSyncResultStreamProvider::new(
-                [0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa],
-                TimeDelta::seconds(2),
-            );
-
-            Ok(Box::new(provider))
-        }
-    }
-}
-
-fn make_status() -> anyhow::Result<Box<dyn Status>> {
-    {
-        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-        {
-            Ok(Box::new(crate::status::NoopStatus::new()))
-        }
-
-        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-        {
-            let status = crate::status::i2c::I2cStatus::new("/dev/i2c-3")?;
-            Ok(Box::new(status))
-        }
-    }
-}
-
-async fn make_onboarding(cfg: &AppConfig) -> anyhow::Result<Box<dyn Onboarding>> {
-    match cfg.onboarding_strategy {
-        OnboardingStrategy::Ble => todo!(),
-        OnboardingStrategy::Local => {
-            let onboarding = LocalOnboarding::new(cfg.auth0.clone(), cfg.wifi.clone());
-            Ok(Box::new(onboarding))
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

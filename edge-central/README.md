@@ -19,10 +19,16 @@ cargo build --target aarch64-unknown-linux-musl
 or
 
 ```
-just central-build
+just central-build-dietpi
 ```
 
-and to roll-out on the pi directly
+or
+
+```
+just central-run-local
+```
+
+and to roll-out on the diet / orange pi directly
 
 ```
 just central-build-roll
