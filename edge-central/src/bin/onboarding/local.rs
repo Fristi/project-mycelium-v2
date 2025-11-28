@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use tokio::time::{sleep, Duration};
-use wifi_rs::prelude::Connectivity;
-
+use tracing::info;
 use crate::{
     auth::auth0::{TokenResult, TokenStatus},
     cfg::{Auth0Config, WifiConfig},
@@ -24,21 +23,11 @@ impl LocalOnboarding {
 #[async_trait]
 impl Onboarding for LocalOnboarding {
     async fn process(&self) -> anyhow::Result<EdgeState> {
-        // let mut wifi = wifi_rs::WiFi::new(None);
-        // let wifi_connection = wifi
-        //     .connect(&self.wifi.ssid, &self.wifi.password)
-        //     .unwrap_or(false);
-
-        // if !wifi_connection {
-        //     anyhow::bail!("Failed to connect to WiFi with provided credentials");
-        // }
-
-        // sleep(Duration::from_secs(3)).await;
 
         let device_code = crate::auth::auth0::request_device_code(&self.auth0).await?;
 
-        println!("Verification code: {}", device_code.user_code);
-        println!(
+        info!("Verification code: {}", device_code.user_code);
+        info!(
             "Verification url: {}",
             device_code.verification_uri_complete
         );
@@ -62,7 +51,7 @@ impl Onboarding for LocalOnboarding {
                     });
                 }
                 Ok(TokenResult::AccessToken { .. }) => {
-                    println!("Received access token without refresh token, skipping");
+                    info!("Received access token without refresh token, skipping");
                 }
                 Ok(TokenResult::Error { error }) => match error {
                     TokenStatus::ExpiredToken
@@ -71,7 +60,7 @@ impl Onboarding for LocalOnboarding {
                         anyhow::bail!("Failed with {:?}", error);
                     }
                     TokenStatus::AuthorizationPending | TokenStatus::SlowDown => {
-                        println!("Auth0 status: {:?}", error);
+                        info!("Auth0 status: {:?}", error);
                     }
                 },
                 Err(error) => {

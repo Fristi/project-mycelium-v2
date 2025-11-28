@@ -7,8 +7,7 @@ pub mod status;
 
 use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
-use anyhow::Ok;
-use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
+use anyhow::*;
 use dotenv::dotenv;
 use edge_client_backend::{apis::configuration::{Configuration}, models::{StationInsert, StationMeasurement}};
 use futures::{stream, StreamExt};
@@ -17,17 +16,13 @@ use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc};
-
-use crate::{
-    cfg::{AppConfig, OnboardingStrategy, PeripheralSyncMode},
-    data::sqlite::SqliteEdgeStateRepository,
-    measurements::{
-        btleplug::BtleplugPeripheralSyncResultStreamProvider,
-        random::RandomPeripheralSyncResultStreamProvider,
-        types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider},
-    },
-    onboarding::{local::LocalOnboarding, types::Onboarding}, status::{Status, StatusSummary},
-};
+use crate::measurements::types::PeripheralSyncResult;
+use crate::data::sqlite::SqliteEdgeStateRepository;
+use crate::cfg::AppConfig;
+use crate::status::StatusSummary;
+use crate::measurements::make_peripheral_sync_stream_provider;
+use crate::onboarding::make_onboarding;
+use crate::status::make_status;
 
 #[tokio::main]
 async fn main() {
@@ -46,22 +41,9 @@ async fn main() {
 
 async fn work() -> anyhow::Result<()> {
 
-    // dotenv()?;
+    dotenv()?;
 
-    let mut s = status::i2c::I2cStatus::new("/dev/i2c-3")?;
-
-    let summary = StatusSummary {
-        from: DateTime::from_naive_utc_and_offset(NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_opt(12, 0, 0).unwrap(), Utc),
-        till: DateTime::from_naive_utc_and_offset(NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_opt(13, 0, 0).unwrap(), Utc),
-        temperature: 22.0,
-        humidity: 40.0,
-        soil_moisture: 30.0,
-        light: 100.0
-    };
-
-    s.show(&summary);
-
-    let app_config = cfg::AppConfig::from_env()?;
+    let app_config = AppConfig::from_env()?;
     let opts = SqliteConnectOptions::from_str(&app_config.database_url)?
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
@@ -108,8 +90,6 @@ async fn work() -> anyhow::Result<()> {
         .with(TracingMiddleware::default())
         .build();
 
-    
-
     let configuration: Configuration = Configuration {
         base_path: app_config.backend_url,
         user_agent: None,
@@ -125,8 +105,7 @@ async fn work() -> anyhow::Result<()> {
 
     stream
         .for_each(|m| async {
-            let mut status = status::i2c::I2cStatus::new("/dev/i2c-3").unwrap();
-            if let Err(err) = sync_measurements(&configuration, m, &mut status).await {
+            if let Err(err) = sync_measurements(&configuration, m).await {
                 tracing::error!("Failed to sync measurements {}", err);
             }
         })
@@ -135,10 +114,9 @@ async fn work() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn sync_measurements<S : Status>(configuration: &Configuration, m: PeripheralSyncResult, status: &mut S) -> anyhow::Result<()> {
+async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult) -> anyhow::Result<()> {
 
     let mac = format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]);
-
     let station_insert = StationInsert::new(mac, "Unnamed".to_string());
 
     let id = edge_client_backend::apis::default_api::add_station(&configuration, station_insert).await?;
@@ -158,42 +136,15 @@ async fn sync_measurements<S : Status>(configuration: &Configuration, m: Periphe
     }
 
     edge_client_backend::apis::default_api::checkin_station(&configuration, id.to_string().as_str(), Some(measurements)).await?;
-
     match summary {
-        Some(m) => status.show(&m)?,
+        Some(m) => {
+            let mut status = make_status()?;
+            status.show(&m)?
+        },
         None => ()
     }
 
     Ok(())            
-}
-
-async fn make_peripheral_sync_stream_provider(
-    mode: &PeripheralSyncMode,
-) -> anyhow::Result<Box<dyn PeripheralSyncResultStreamProvider>> {
-    match mode {
-        PeripheralSyncMode::Ble => {
-            let provider = BtleplugPeripheralSyncResultStreamProvider::new().await?;
-            Ok(Box::new(provider))
-        }
-        PeripheralSyncMode::Random => {
-            let provider = RandomPeripheralSyncResultStreamProvider::new(
-                [0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa],
-                TimeDelta::seconds(2),
-            );
-
-            Ok(Box::new(provider))
-        }
-    }
-}
-
-async fn make_onboarding(cfg: &AppConfig) -> anyhow::Result<Box<dyn Onboarding>> {
-    match cfg.onboarding_strategy {
-        OnboardingStrategy::Ble => todo!(),
-        OnboardingStrategy::Local => {
-            let onboarding = LocalOnboarding::new(cfg.auth0.clone(), cfg.wifi.clone());
-            Ok(Box::new(onboarding))
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

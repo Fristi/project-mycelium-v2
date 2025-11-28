@@ -1,11 +1,28 @@
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
 pub mod i2c;
+pub mod noop;
 
 use anyhow::Result;
-use chrono::{Date, DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use edge_protocol::MeasurementSerieEntry;
 
 pub trait Status {
     fn show(&mut self, summary: &StatusSummary) -> Result<()>;
+}
+
+pub fn make_status() -> Result<Box<dyn Status>> {
+    {
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        {
+            anyhow::Ok(Box::new(noop::NoopStatus::new()))
+        }
+
+        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+        {
+            let status = i2c::I2cStatus::new("/dev/i2c-3")?;
+            Ok(Box::new(status))
+        }
+    }
 }
 
 pub struct StatusSummary {
