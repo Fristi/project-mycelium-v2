@@ -108,9 +108,7 @@ async fn work() -> anyhow::Result<()> {
 
     stream
         .for_each(|m| async {
-            let mut box_status = make_status().unwrap();
-            let status = box_status.as_mut();
-            if let Err(err) = sync_measurements(&configuration, m, status).await {
+            if let Err(err) = sync_measurements(&configuration, m).await {
                 tracing::error!("Failed to sync measurements {}", err);
             }
         })
@@ -119,10 +117,9 @@ async fn work() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult, status: &mut dyn Status) -> anyhow::Result<()> {
+async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult) -> anyhow::Result<()> {
 
     let mac = format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]);
-
     let station_insert = StationInsert::new(mac, "Unnamed".to_string());
 
     let id = edge_client_backend::apis::default_api::add_station(&configuration, station_insert).await?;
@@ -140,6 +137,8 @@ async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResul
             tank_pf: 0_f64
         });
     }
+
+    let mut status = make_status()?;
 
     edge_client_backend::apis::default_api::checkin_station(&configuration, id.to_string().as_str(), Some(measurements)).await?;
 
