@@ -1,8 +1,23 @@
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
 pub mod i2c;
 
 use anyhow::Result;
-use chrono::{Date, DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use edge_protocol::MeasurementSerieEntry;
+
+pub struct NoopStatus;
+
+impl NoopStatus {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Status for NoopStatus {
+    fn show(&mut self, _summary: &StatusSummary) -> Result<()> {
+        Ok(())
+    }
+}
 
 pub trait Status {
     fn show(&mut self, summary: &StatusSummary) -> Result<()>;

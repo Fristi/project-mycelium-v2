@@ -1,13 +1,12 @@
 use crate::status::{Status, StatusSummary};
 use embedded_graphics::{
     mono_font::{
-        MonoTextStyle, MonoTextStyleBuilder, ascii::{FONT_5X7}
+        MonoTextStyle, ascii::{FONT_5X7}
     },
     pixelcolor::BinaryColor,
     prelude::*,
     text::{Alignment, Text},
 };
-use sqlx::any;
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 use ssd1306::mode::BufferedGraphicsMode;
 use linux_embedded_hal::I2cdev;

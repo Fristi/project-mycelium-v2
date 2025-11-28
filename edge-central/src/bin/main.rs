@@ -8,16 +8,15 @@ pub mod status;
 use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
 use anyhow::Ok;
-use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
+use chrono::TimeDelta;
 use dotenv::dotenv;
 use edge_client_backend::{apis::configuration::{Configuration}, models::{StationInsert, StationMeasurement}};
 use futures::{stream, StreamExt};
 use reqwest::{Client, Request, Url};
 use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
-use sqlx::{any, sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool}};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc};
-
 use crate::{
     cfg::{AppConfig, OnboardingStrategy, PeripheralSyncMode},
     data::sqlite::SqliteEdgeStateRepository,
@@ -45,22 +44,9 @@ async fn main() {
 
 async fn work() -> anyhow::Result<()> {
 
-    // dotenv()?;
+    dotenv()?;
 
-    let mut s = status::i2c::I2cStatus::new("/dev/i2c-3")?;
-
-    let summary = StatusSummary {
-        from: DateTime::from_naive_utc_and_offset(NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_opt(12, 0, 0).unwrap(), Utc),
-        till: DateTime::from_naive_utc_and_offset(NaiveDate::from_ymd_opt(2023, 1, 1).unwrap().and_hms_opt(13, 0, 0).unwrap(), Utc),
-        temperature: 22.0,
-        humidity: 40.0,
-        soil_moisture: 30.0,
-        light: 100.0
-    };
-
-    s.show(&summary);
-
-    let app_config = cfg::AppConfig::from_env()?;
+    let app_config = AppConfig::from_env()?;
     let opts = SqliteConnectOptions::from_str(&app_config.database_url)?
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
@@ -107,8 +93,6 @@ async fn work() -> anyhow::Result<()> {
         .with(TracingMiddleware::default())
         .build();
 
-    
-
     let configuration: Configuration = Configuration {
         base_path: app_config.backend_url,
         user_agent: None,
@@ -124,8 +108,9 @@ async fn work() -> anyhow::Result<()> {
 
     stream
         .for_each(|m| async {
-            let mut status = status::i2c::I2cStatus::new("/dev/i2c-3").unwrap();
-            if let Err(err) = sync_measurements(&configuration, m, &mut status).await {
+            let mut box_status = make_status().unwrap();
+            let status = box_status.as_mut();
+            if let Err(err) = sync_measurements(&configuration, m, status).await {
                 tracing::error!("Failed to sync measurements {}", err);
             }
         })
@@ -134,7 +119,7 @@ async fn work() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn sync_measurements<S : Status>(configuration: &Configuration, m: PeripheralSyncResult, status: &mut S) -> anyhow::Result<()> {
+async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult, status: &mut dyn Status) -> anyhow::Result<()> {
 
     let mac = format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]);
 
@@ -171,7 +156,20 @@ async fn make_peripheral_sync_stream_provider(
 ) -> anyhow::Result<Box<dyn PeripheralSyncResultStreamProvider>> {
     match mode {
         PeripheralSyncMode::Ble => {
-            anyhow::bail!("Not implemented")
+            {
+                #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+                {
+                    let provider = crate::measurements::btleplug::BtleplugPeripheralSyncResultStreamProvider::new().await?;
+
+                    Ok(Box::new(provider))
+                }
+
+                #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+                {
+                    todo!("Not implemented")
+                }
+            }
+
         }
         PeripheralSyncMode::Random => {
             let provider = RandomPeripheralSyncResultStreamProvider::new(
@@ -180,6 +178,21 @@ async fn make_peripheral_sync_stream_provider(
             );
 
             Ok(Box::new(provider))
+        }
+    }
+}
+
+fn make_status() -> anyhow::Result<Box<dyn Status>> {
+    {
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        {
+            Ok(Box::new(crate::status::NoopStatus::new()))
+        }
+
+        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+        {
+            let status = crate::status::i2c::I2cStatus::new("/dev/i2c-3")?;
+            Ok(Box::new(status))
         }
     }
 }

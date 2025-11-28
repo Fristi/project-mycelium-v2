@@ -3,7 +3,6 @@ use std::{pin::Pin, time::Duration};
 use chrono::{TimeDelta, Utc};
 use edge_protocol::{Measurement, MeasurementSerieEntry};
 use futures::{stream, Stream};
-use rand::Rng;
 use tokio::time::sleep;
 
 use crate::measurements::types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider};
@@ -27,7 +26,7 @@ impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProv
             let mut measurements = vec![];
 
             for _ in 0..6 {
-                let measurement = random_measurement(&mut rand::rng());
+                let measurement = random_measurement();
                 let serie_entry = MeasurementSerieEntry {
                     timestamp: Utc::now().naive_utc(),
                     measurement,
@@ -51,12 +50,12 @@ impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProv
     }
 }
 
-fn random_measurement<T: Rng>(rng: &mut T) -> Measurement {
+fn random_measurement() -> Measurement {
     Measurement {
-        battery: (rng.random::<u8>() % 101) as u8,
-        lux: (rng.random::<u32>() % 100001) as f32,
-        temperature: (rng.random::<u32>() % 46) as f32,
-        humidity: (rng.random::<u32>() % 101) as f32,
-        soil_pf: (rng.random::<u32>() % 450) as f32,
+        battery: (rand::random::<u8>() % 101) as u8,
+        lux: (rand::random::<u32>() % 100001) as f32,
+        temperature: (rand::random::<u32>() % 46) as f32,
+        humidity: (rand::random::<u32>() % 101) as f32,
+        soil_pf: (rand::random::<u32>() % 450) as f32,
     }
 }
