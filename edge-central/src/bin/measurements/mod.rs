@@ -26,7 +26,15 @@ pub async fn make_peripheral_sync_stream_provider(
 
                 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
                 {
-                    todo!("Not implemented")
+                    use bt_hci::controller::ExternalController;
+                    use tokio::task::LocalSet;
+                    use crate::{ble::hci::Transport, measurements::trouble::TroublePeripheralSyncResultStreamProvider};
+
+                    let transport = Transport::new(0)?;
+                    let controller = ExternalController::<_, 8>::new(transport);
+                    let ls = LocalSet::new();
+                    let provider = TroublePeripheralSyncResultStreamProvider::new(controller, ls).await;
+                    anyhow::Ok(Box::new(provider))
                 }
             }
 
