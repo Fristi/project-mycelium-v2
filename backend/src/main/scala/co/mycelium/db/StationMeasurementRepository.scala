@@ -1,12 +1,13 @@
 package co.mycelium.db
 
 import cats.tagless.{Derive, FunctorK}
-import co.mycelium.domain._
-import doobie._
-import doobie.implicits._
-import doobie.postgres.implicits._
+import co.mycelium.domain.*
+import doobie.*
+import doobie.implicits.*
+import doobie.postgres.implicits.*
 
 import java.util.UUID
+import scala.annotation.experimental
 
 trait StationMeasurementRepository[F[_]] {
   def insertMany(stationId: UUID, measurements: List[StationMeasurement]): F[Int]

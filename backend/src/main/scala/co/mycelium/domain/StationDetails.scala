@@ -1,3 +1,5 @@
 package co.mycelium.domain
 
-final case class StationDetails(station: Station, measurements: List[StationMeasurement])
+import io.circe.{Decoder, Encoder}
+
+final case class StationDetails(station: Station, measurements: List[StationMeasurement]) derives Encoder.AsObject, Decoder

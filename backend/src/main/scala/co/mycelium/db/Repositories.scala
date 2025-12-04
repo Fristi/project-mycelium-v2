@@ -2,7 +2,9 @@ package co.mycelium.db
 
 import cats.effect.kernel.MonadCancelThrow
 import cats.tagless.{Derive, FunctorK}
-import doobie._
+import doobie.*
+
+import scala.annotation.experimental
 
 trait Repositories[F[_]] {
   def stationLog: StationLogRepository[F]

@@ -1,4 +1,4 @@
-scalaVersion := "2.13.18"
+scalaVersion := "3.7.4"
 name         := "backend"
 organization := "co.mycelium"
 version      := "1.0"
@@ -9,14 +9,13 @@ libraryDependencies ++= Seq(
   "org.tpolecat"                  %% "doobie-hikari"              % versions.doobie,
   "org.tpolecat"                  %% "doobie-postgres-circe"      % versions.doobie,
   "org.tpolecat"                  %% "doobie-weaver"              % versions.doobie % Test,
-  "org.typelevel"                 %% "cats-tagless-macros"        % "0.16.3",
+  "org.typelevel"                 %% "cats-tagless-core"          % "0.16.3",
   "com.github.alonsodomin.cron4s" %% "cron4s-core"                % "0.8.2",
   "org.http4s"                    %% "http4s-dsl"                 % versions.http4s,
   "org.http4s"                    %% "http4s-ember-server"        % versions.http4s,
   "com.softwaremill.sttp.tapir"   %% "tapir-http4s-server"        % versions.tapir,
   "com.softwaremill.sttp.tapir"   %% "tapir-json-circe"           % versions.tapir,
   "org.flywaydb"                   % "flyway-database-postgresql" % "11.18.0",
-  "io.circe"                      %% "circe-generic-extras"       % "0.14.4",
   "ch.qos.logback"                 % "logback-classic"            % "1.5.21",
   "com.github.jwt-scala"          %% "jwt-core"                   % versions.jwt_scala,
   "com.github.jwt-scala"          %% "jwt-circe"                  % versions.jwt_scala,
@@ -30,13 +29,7 @@ libraryDependencies ++= Seq(
   "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml"         % "0.11.10"
 )
 
-Compile / scalacOptions ++= {
-  CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, n)) if n >= 13 => "-Ymacro-annotations" :: Nil
-    case _                       => Nil
-  }
-}
-
+Compile / scalacOptions ++= Seq("-experimental")
 mainClass := Some("co.mycelium.Main")
 
 val tag = sys.props.getOrElse("imageTag", "latest")

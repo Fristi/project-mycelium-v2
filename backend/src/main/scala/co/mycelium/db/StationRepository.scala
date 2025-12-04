@@ -3,14 +3,15 @@ package co.mycelium.db
 import cats.{Applicative, Traverse}
 import cats.data.NonEmptyList
 import cats.tagless.{Derive, FunctorK}
-import cats.implicits._
-import co.mycelium.domain._
-import doobie._
-import doobie.implicits._
-import doobie.postgres.implicits._
+import cats.implicits.*
+import co.mycelium.domain.*
+import doobie.*
+import doobie.implicits.*
+import doobie.postgres.implicits.*
 
 import java.time.Instant
 import java.util.UUID
+import scala.annotation.experimental
 
 trait StationRepository[F[_]] {
   def insert(station: Station, on: Instant): F[UUID]
