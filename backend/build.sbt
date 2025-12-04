@@ -1,35 +1,33 @@
-scalaVersion := "2.13.16"
+scalaVersion := "2.13.18"
 name         := "backend"
 organization := "co.mycelium"
 version      := "1.0"
 
-val doobieVersion = "1.0.0-RC9"
-
 libraryDependencies ++= Seq(
-  "org.tpolecat"                  %% "doobie-core"           % doobieVersion,
-  "org.tpolecat"                  %% "doobie-postgres"       % doobieVersion,
-  "org.tpolecat"                  %% "doobie-hikari"         % doobieVersion,
-  "org.tpolecat"                  %% "doobie-postgres-circe" % doobieVersion,
-  "org.tpolecat"                  %% "doobie-weaver" % doobieVersion % Test,
-  "org.typelevel"                 %% "cats-tagless-macros"   % "0.15.0",
-  "com.github.alonsodomin.cron4s" %% "cron4s-core"           % "0.7.0",
-  "org.http4s"                    %% "http4s-dsl"            % "0.23.30",
-  "org.http4s"                    %% "http4s-ember-server"   % "0.23.30",
-  "com.softwaremill.sttp.tapir"   %% "tapir-http4s-server"   % "1.11.40",
-  "com.softwaremill.sttp.tapir"   %% "tapir-json-circe"      % "1.11.40",
-  "org.flywaydb"                   % "flyway-database-postgresql"           % "11.10.4",
-  "io.circe"                      %% "circe-generic-extras"  % "0.14.3",
-  "ch.qos.logback"                 % "logback-classic"       % "1.5.0",
-  "com.github.jwt-scala"          %% "jwt-core"              % "10.0.0",
-  "com.github.jwt-scala"          %% "jwt-circe"             % "10.0.0",
-  "com.auth0"                      % "jwks-rsa"              % "0.22.1",
-  "com.github.fs2-blobstore"      %% "s3"                    % "0.9.12",
-  "is.cir"                        %% "ciris"                 % "3.5.0",
-  "com.github.cb372"              %% "cats-retry"            % "3.1.0",
-  "io.sentry"                      % "sentry-logback"        % "7.4.0",
-  "org.postgresql"                 % "postgresql"            % "42.7.7",
-  "com.softwaremill.sttp.tapir"   %% "tapir-openapi-docs"    % "1.9.10",
-  "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml"    % "0.7.4"
+  "org.tpolecat"                  %% "doobie-core"                % versions.doobie,
+  "org.tpolecat"                  %% "doobie-postgres"            % versions.doobie,
+  "org.tpolecat"                  %% "doobie-hikari"              % versions.doobie,
+  "org.tpolecat"                  %% "doobie-postgres-circe"      % versions.doobie,
+  "org.tpolecat"                  %% "doobie-weaver"              % versions.doobie % Test,
+  "org.typelevel"                 %% "cats-tagless-macros"        % "0.16.3",
+  "com.github.alonsodomin.cron4s" %% "cron4s-core"                % "0.8.2",
+  "org.http4s"                    %% "http4s-dsl"                 % versions.http4s,
+  "org.http4s"                    %% "http4s-ember-server"        % versions.http4s,
+  "com.softwaremill.sttp.tapir"   %% "tapir-http4s-server"        % versions.tapir,
+  "com.softwaremill.sttp.tapir"   %% "tapir-json-circe"           % versions.tapir,
+  "org.flywaydb"                   % "flyway-database-postgresql" % "11.18.0",
+  "io.circe"                      %% "circe-generic-extras"       % "0.14.4",
+  "ch.qos.logback"                 % "logback-classic"            % "1.5.21",
+  "com.github.jwt-scala"          %% "jwt-core"                   % versions.jwt_scala,
+  "com.github.jwt-scala"          %% "jwt-circe"                  % versions.jwt_scala,
+  "com.auth0"                      % "jwks-rsa"                   % "0.23.0",
+  "com.github.fs2-blobstore"      %% "s3"                         % "0.9.15",
+  "is.cir"                        %% "ciris"                      % "3.11.1",
+  "com.github.cb372"              %% "cats-retry"                 % "3.1.3",
+  "io.sentry"                      % "sentry-logback"             % "8.27.1",
+  "org.postgresql"                 % "postgresql"                 % "42.7.8",
+  "com.softwaremill.sttp.tapir"   %% "tapir-openapi-docs"         % "1.12.6",
+  "com.softwaremill.sttp.apispec" %% "openapi-circe-yaml"         % "0.11.10"
 )
 
 Compile / scalacOptions ++= {
@@ -43,9 +41,9 @@ mainClass := Some("co.mycelium.Main")
 
 val tag = sys.props.getOrElse("imageTag", "latest")
 
-jibBaseImage := "gcr.io/distroless/java17-debian11"
-jibImageFormat := JibImageFormat.Docker
-jibPlatforms := Set(JibPlatforms.amd64, JibPlatforms.arm64)
-jibVersion := tag
-jibName := "mycelium-backend"
+jibBaseImage    := "gcr.io/distroless/java17-debian11"
+jibImageFormat  := JibImageFormat.Docker
+jibPlatforms    := Set(JibPlatforms.amd64, JibPlatforms.arm64)
+jibVersion      := tag
+jibName         := "mycelium-backend"
 jibOrganization := "markdj"
