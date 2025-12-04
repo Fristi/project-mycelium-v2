@@ -64,7 +64,7 @@ object Stations extends TapirSchemas {
     val all = Set(list, add, details, update, delete, checkIn, watered, log)
   }
 
-  def toMyceliumError(error: String): ValuedEndpointOutput[_] =
+  def toMyceliumError(error: String): ValuedEndpointOutput[?] =
     ValuedEndpointOutput(jsonBody[MyceliumError], MyceliumError(error))
 
   val serverOptions = Http4sServerOptions
