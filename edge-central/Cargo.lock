@@ -858,6 +858,7 @@ dependencies = [
  "sqlx",
  "ssd1306",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
  "trouble-host",

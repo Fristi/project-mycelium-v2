@@ -11,5 +11,5 @@ pub struct PeripheralSyncResult {
 }
 
 pub trait PeripheralSyncResultStreamProvider {
-    fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>>;
+    fn stream(self: Box<Self>) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>>>>;
 }
