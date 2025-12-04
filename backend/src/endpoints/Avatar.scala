@@ -1,7 +1,5 @@
 package co.mycelium.endpoints
 
-import blobstore.s3.S3Store
-import blobstore.url.{Authority, Url}
 import cats.effect.IO
 import org.http4s.{HttpRoutes, Response}
 import org.http4s.dsl.io._

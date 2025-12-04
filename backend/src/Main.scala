@@ -1,6 +1,5 @@
 package co.mycelium
 
-import blobstore.s3.S3Store
 import cats.data.Kleisli
 import cats.effect._
 import cats.implicits._
@@ -14,15 +13,6 @@ import org.http4s.server.staticcontent._
 import org.http4s.{HttpApp, Request, Response}
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
-import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration
-import software.amazon.awssdk.core.retry.RetryPolicy
-import software.amazon.awssdk.core.retry.conditions.RetryCondition
-import software.amazon.awssdk.http.async.SdkAsyncHttpClient
-import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{BucketAlreadyExistsException, CreateBucketRequest}
 
 import java.net.URI
 import java.time.Duration
