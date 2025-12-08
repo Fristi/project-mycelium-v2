@@ -143,6 +143,16 @@ export class MyceliumBuild {
   }
 
   /**
+   * Test the Scala backend
+   */
+  @func()
+  async buildBackend(): Promise<string> {
+    return this.containerBackend()
+      .withExec(["sbt", "compile"])
+      .stdout();
+  }
+
+  /**
    * Container for building the Tauri app
    */
   containerApp(): Container {
