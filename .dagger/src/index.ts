@@ -55,32 +55,63 @@ export class MyceliumBuild {
 
     return dag
       .container()
-      .from("sbtscala/scala-sbt:eclipse-temurin-alpine-21.0.7_6_1.11.3_2.13.16")
+      .from("sbtscala/scala-sbt:eclipse-temurin-alpine-24.0.1_9_1.11.7_3.7.4")
       .withMountedCache("/root/.sbt", dag.cacheVolume("sbt-cache"))
       .withMountedCache("/root/.ivy2", dag.cacheVolume("ivy2-cache"))
       .withMountedCache("/root/.cache/coursier", dag.cacheVolume("scala-coursier-cache"))
-      .withDirectory("/workspace", src.directory("backend").filter({ include: ["project/build.properties", "project/plugins.sbt", "src/**", ".sbtopts", ".scalafmt.conf", "build.sbt"]}))
+      .withDirectory("/workspace", src.directory("backend").filter({ include: ["project/build.properties", "project/plugins.sbt", "project/*.scala", "src/**", ".sbtopts", ".scalafmt.conf", "build.sbt"]}))
       .withWorkdir("/workspace");
-  }
-
-  @func()
-  publishBackend(password: Secret, tag?: string): Promise<string> {
-    return this
-      .containerBackend()
-      .withEnvVariable("JIB_TARGET_IMAGE_USERNAME", "markdj")
-      .withSecretVariable("JIB_TARGET_IMAGE_PASSWORD", password)
-      .withExec(["sbt", `-DimageTag=${tag ?? "latest"}`, "jibImageBuild"])
-      .stdout();
   }
 
   /**
    * Build the Scala backend
    */
+  async buildBackend_(backendJar: File, arch: string): Promise<Container> {
+    const backendNative = dag
+      .container({ platform: arch as any })
+      .from("ghcr.io/graalvm/native-image-community:25-muslib")
+      .withWorkdir("/workspace")
+      .withFile("/workspace/backend.jar", backendJar)
+      .withExec([
+        "native-image",
+        "--no-fallback",
+        "--static",
+        "--libc=musl",
+        "--report-unsupported-elements-at-runtime",
+        "-H:IncludeResources=META-INF/services/.*,resources/logback.*\\.xml",
+        "--initialize-at-run-time=org.postgresql",
+        "--initialize-at-run-time=org.postgresql.Driver",
+        "--initialize-at-run-time=org.postgresql.jdbc",
+        "-cp",
+        "/workspace/backend.jar",
+        "co.mycelium.Main",
+        "/workspace/backend"       // output native binary
+      ])
+      .withExec(["chmod", "+x", "/workspace/backend"]);
+
+    return dag
+      .container({ platform: arch as any })
+      .from("gcr.io/distroless/cc")
+      .withWorkdir("/app")
+      .withExposedPort(8080)
+      .withFile("/app/backend", backendNative.file("/workspace/backend"))
+      .withEntrypoint(["/app/backend"])
+      .sync();
+  }
+
   @func()
-  async buildBackend(): Promise<string> {
-    return this.containerBackend()
-      .withExec(["sbt", "compile"])
-      .stdout();
+  async publishBackend(password: Secret, tag?: string): Promise<string> {
+      const platforms = ["linux/amd64", "linux/arm64"];
+      const backendJar = await this.containerBackend()
+        .withExec(["sbt", "assembly"])
+        .file("target/scala-3.7.4/backend-assembly-1.0.jar");
+
+      const containers = await Promise.all(platforms.map(x => this.buildBackend_(backendJar, x)));
+
+      return dag
+        .container()
+        .withRegistryAuth("docker.io", "markdj", password)
+        .publish(`markdj/mycelium-backend:${tag ?? "latest"}`, { platformVariants: containers });
   }
 
   @func()
