@@ -21,8 +21,8 @@ object AppConfig {
     (
       env("PG_HOST").as[String].default("localhost"),
       env("PG_PORT").as[Int].default(5432),
-      env("PG_USER").as[String].default("mycelium"),
-      env("PG_PASS").as[String].secret.default(Secret("mycelium")),
+      env("PG_USER").as[String].default("postgres"),
+      env("PG_PASS").as[String].secret.default(Secret("postgres")),
       env("PG_DB").as[String].default("mycelium")
     ).parMapN(DbConfig)
 

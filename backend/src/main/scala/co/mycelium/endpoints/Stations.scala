@@ -1,16 +1,15 @@
 package co.mycelium.endpoints
 
 import cats.effect.IO
-import co.mycelium.CirceCodecs._
 import co.mycelium.db.Repositories
-import co.mycelium.domain._
+import co.mycelium.domain.*
 import cron4s.CronExpr
 import cron4s.lib.javatime.javaTemporalInstance
 import org.http4s.HttpRoutes
-import sttp.tapir._
+import sttp.tapir.*
 import sttp.tapir.generic.Configuration
-import sttp.tapir.generic.auto._
-import sttp.tapir.json.circe._
+import sttp.tapir.generic.auto.*
+import sttp.tapir.json.circe.*
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 
 import java.time.Instant
@@ -24,6 +23,9 @@ import sttp.tapir.server.interceptor.cors.CORSInterceptor
 import sttp.tapir.server.interceptor.cors.CORSConfig
 import sttp.model.headers.Origin
 
+import scala.annotation.experimental
+
+@experimental
 object Stations extends TapirSchemas {
 
   object endpoints {
@@ -62,13 +64,27 @@ object Stations extends TapirSchemas {
     val all = Set(list, add, details, update, delete, checkIn, watered, log)
   }
 
-  def toMyceliumError(error: String): ValuedEndpointOutput[_] =
+  def toMyceliumError(error: String): ValuedEndpointOutput[?] =
     ValuedEndpointOutput(jsonBody[MyceliumError], MyceliumError(error))
 
-  val serverOptions = Http4sServerOptions.customiseInterceptors[IO]
+  val serverOptions = Http4sServerOptions
+    .customiseInterceptors[IO]
     .defaultHandlers(toMyceliumError)
-    .serverLog(Some(Http4sServerOptions.defaultServerLog[IO].logWhenHandled(true).logWhenReceived(true).logAllDecodeFailures(true)))
-    .corsInterceptor(CORSInterceptor.customOrThrow[IO](CORSConfig.default.allowCredentials.allowOrigin(Origin.Host("http", "localhost", Some(1420)))))
+    .serverLog(
+      Some(
+        Http4sServerOptions
+          .defaultServerLog[IO]
+          .logWhenHandled(true)
+          .logWhenReceived(true)
+          .logAllDecodeFailures(true)
+      )
+    )
+    .corsInterceptor(
+      CORSInterceptor.customOrThrow[IO](
+        CORSConfig.default.allowCredentials
+          .allowOrigin(Origin.Host("http", "localhost", Some(1420)))
+      )
+    )
     .options
 
   def routes(repos: Repositories[IO]): HttpRoutes[IO] = {
@@ -134,8 +150,6 @@ object Stations extends TapirSchemas {
     }
 
     val routes = List(list, add, delete, log, watered, checkin, details, update)
-
-
 
     Http4sServerInterpreter(serverOptions)
       .toRoutes(routes)

@@ -2,7 +2,9 @@ package co.mycelium.db
 
 import cats.effect.kernel.MonadCancelThrow
 import cats.tagless.{Derive, FunctorK}
-import doobie._
+import doobie.*
+
+import scala.annotation.experimental
 
 trait Repositories[F[_]] {
   def stationLog: StationLogRepository[F]
@@ -11,8 +13,10 @@ trait Repositories[F[_]] {
 }
 
 object DoobieRepositories extends Repositories[ConnectionIO] {
-  override def stationLog: StationLogRepository[ConnectionIO] = DoobieStationLogRepository
-  override def stations: StationRepository[ConnectionIO]      = DoobieStationRepository
+  override def stationLog: StationLogRepository[ConnectionIO] = 
+    DoobieStationLogRepository
+  override def stations: StationRepository[ConnectionIO]      = 
+    DoobieStationRepository
   override def measurements: StationMeasurementRepository[ConnectionIO] =
     DoobieStationMeasurementRepository
 }

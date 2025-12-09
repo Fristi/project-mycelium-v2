@@ -1,3 +1,5 @@
 package co.mycelium.endpoints
 
-final case class MyceliumError(error: String)
+import io.circe.{Decoder, Encoder}
+
+final case class MyceliumError(error: String) derives Encoder.AsObject, Decoder

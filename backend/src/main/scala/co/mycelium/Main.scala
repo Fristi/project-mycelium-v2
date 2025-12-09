@@ -1,6 +1,5 @@
 package co.mycelium
 
-import blobstore.s3.S3Store
 import cats.data.Kleisli
 import cats.effect._
 import cats.implicits._
@@ -14,21 +13,14 @@ import org.http4s.server.staticcontent._
 import org.http4s.{HttpApp, Request, Response}
 import org.typelevel.log4cats.LoggerFactory
 import org.typelevel.log4cats.slf4j.Slf4jFactory
-import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
-import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration
-import software.amazon.awssdk.core.retry.RetryPolicy
-import software.amazon.awssdk.core.retry.conditions.RetryCondition
-import software.amazon.awssdk.http.async.SdkAsyncHttpClient
-import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{BucketAlreadyExistsException, CreateBucketRequest}
 
 import java.net.URI
 import java.time.Duration
 import org.http4s.Method
 import sttp.tapir.server.interceptor.cors
 import org.http4s.server.middleware.CORSPolicy
+import co.mycelium.AppConfig
+import co.mycelium.Transactors
 
 object Main extends IOApp {
 
@@ -62,48 +54,10 @@ object Main extends IOApp {
       )
     )
 
-//  val overrideConfiguration: ClientOverrideConfiguration =
-//    ClientOverrideConfiguration.builder()
-//      .apiCallTimeout(Duration.ofSeconds(30))
-//      .apiCallAttemptTimeout(Duration.ofSeconds(20))
-//      .retryPolicy(RetryPolicy.builder()
-//        .numRetries(5)
-//        .retryCondition(RetryCondition.defaultRetryCondition())
-//        .build())
-//      .build()
-//
-//  val httpClient: SdkAsyncHttpClient = NettyNioAsyncHttpClient.builder()
-//    .connectionTimeout(Duration.ofSeconds(20))
-//    .connectionAcquisitionTimeout(Duration.ofSeconds(20))
-//    .connectionMaxIdleTime(Duration.ofSeconds(10))
-//    .build()
-//
-//
-//  def client(blobConfig: S3BlobConfig): S3AsyncClient = S3AsyncClient
-//    .builder()
-//    .region(Region.US_EAST_1)
-//    .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(blobConfig.accessKey, blobConfig.secretKey.value)))
-//    .endpointOverride(URI.create(blobConfig.host))
-//    .overrideConfiguration(overrideConfiguration)
-//    .forcePathStyle(true)
-//    .httpClient(httpClient)
-//    .build()
-
-//  def createBucket(s3: S3AsyncClient) =
-//    IO.fromCompletableFuture(IO.delay(s3.createBucket(CreateBucketRequest.builder().bucket("mycelium").build())))
-//      .void
-//      .recoverWith {
-//        case _: BucketAlreadyExistsException => IO.unit
-//        case error => IO.delay(error.printStackTrace())
-//      }
-
   val app: Resource[IO, Server] =
     for {
       cfg <- Resource.eval(AppConfig.config.load[IO])
       tx  <- Transactors.pg[IO](cfg.db)
-//      s3Client = client(cfg.blob)
-//      _ <- Resource.eval(createBucket(s3Client))
-//      s3 <- Resource.eval(IO.fromOption(S3Store.builder[IO](s3Client).build.toOption)(new Throwable("Wat?")))
       repos = Repositories.fromTransactor(tx)
       app = errorHandling(httpApp(repos))
       app_logging = org.http4s.server.middleware.Logger.httpApp(true, true)(app)

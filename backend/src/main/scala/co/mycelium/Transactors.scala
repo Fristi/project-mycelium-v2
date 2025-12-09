@@ -2,50 +2,44 @@ package co.mycelium
 
 import cats.Applicative
 import cats.effect.{Async, IO, Resource}
-import com.zaxxer.hikari.HikariConfig
-import doobie.hikari.HikariTransactor
-import org.flywaydb.core.Flyway
 import retry._
 import retry.RetryPolicies._
 
 import javax.sql.DataSource
 import scala.concurrent.duration.DurationInt
-object Transactors {
-  def pg[F[_]: Async](cfg: DbConfig): Resource[F, HikariTransactor[F]] = {
-    def flyway(ds: DataSource) =
-      Async[F].delay {
-        Flyway
-          .configure()
-          .locations("migrations")
-          .dataSource(ds)
-          .load()
-          .migrate()
-      }
+import doobie.Transactor
+import java.sql.Connection
+import org.typelevel.keypool.Pool
+import cats.effect.Sync
+import java.io.PrintWriter
+import cats.effect.Temporal
+import doobie.WeakAsync
+import co.mycelium.PooledTransactor.pool
+import java.util.logging.Logger
+import java.sql.SQLException
+import co.mycelium.DbConfig
+import co.mycelium.PooledTransactor
 
+object Transactors {
+  def pg[F[_]: Temporal : WeakAsync](cfg: DbConfig): Resource[F, PooledTransactor[F]] = {
     type ResourceM[A] = Resource[F, A]
 
     def policy[F[_]: Applicative] =
       limitRetries[F](10) join exponentialBackoff[F](200.milliseconds)
 
-    def handleError(error: Throwable, retryDetails: RetryDetails): Resource[F, Unit] = {
-      Resource.eval(Async[F].blocking(error.printStackTrace()))
-    }
+    def handleError(error: Throwable, retryDetails: RetryDetails): Resource[F, Unit] = 
+      Resource.eval(Sync[F].blocking(error.printStackTrace()))
 
-    val config = new HikariConfig()
-    config.setPoolName("mycelium")
-    config.setJdbcUrl(s"jdbc:postgresql://${cfg.host}:${cfg.port}/${cfg.database}")
-    config.setUsername(cfg.username)
-    config.setPassword(cfg.password.value)
-    config.setValidationTimeout(1000)
-    config.setConnectionTimeout(2000)
-    config.setDriverClassName("org.postgresql.Driver")
-    config.setMaximumPoolSize(10)
+    val pooledTransactor = PooledTransactor.pool(
+        s"jdbc:postgresql://${cfg.host}:${cfg.port}/${cfg.database}", 
+        cfg.username,
+        cfg.password.value,
+        10, 
+        scala.concurrent.ExecutionContext.global
+      )
 
-    for {
-      tx <- retryingOnAllErrors[HikariTransactor[F]]
-        .apply[ResourceM, Throwable](policy, handleError)(HikariTransactor.fromHikariConfig(config))
-      _ <- Resource.eval(tx.configure(flyway))
-    } yield tx
+    // retryingOnAllErrors.apply[ResourceM, Throwable](policy, handleError)()
+    pooledTransactor
   }
 
 }
