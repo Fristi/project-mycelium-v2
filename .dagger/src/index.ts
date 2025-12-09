@@ -67,25 +67,34 @@ export class MyceliumBuild {
    * Build the Scala backend
    */
   async buildBackend_(backendJar: File, arch: string): Promise<Container> {
+    const src = this.source;
     const backendNative = dag
       .container({ platform: arch as any })
       .from("ghcr.io/graalvm/native-image-community:25-muslib")
       .withWorkdir("/workspace")
       .withFile("/workspace/backend.jar", backendJar)
+      .withFile("/workspace/reflection-config.json", src.file("backend/reflection-config.json"))
       .withExec([
         "native-image",
         "--no-fallback",
         "--static",
         "--libc=musl",
+        "--initialize-at-build-time",
         "--report-unsupported-elements-at-runtime",
-        "-H:IncludeResources=META-INF/services/.*,resources/logback.*\\.xml",
-        "--initialize-at-run-time=org.postgresql",
-        "--initialize-at-run-time=org.postgresql.Driver",
-        "--initialize-at-run-time=org.postgresql.jdbc",
+        "-H:IncludeResources=META-INF/services/.*,placeholder\\.png,logback\\.xml",
+        "-H:ReflectionConfigurationFiles=reflection-config.json",
+        "--enable-url-protocols=http,https",
+        "--add-opens=java.base/java.nio=ALL-UNNAMED",
+        "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
+        "--trace-class-initialization=ch.qos.logback.classic.Logger",
+        "--trace-object-instantiation=ch.qos.logback.core.AsyncAppenderBase$Worker",
+        "--initialize-at-run-time=io.netty",
+        "--initialize-at-run-time=org.postgresql,org.postgresql.Driver,org.postgresql.jdbc",
         "-cp",
         "/workspace/backend.jar",
         "co.mycelium.Main",
-        "/workspace/backend"       // output native binary
+        "/workspace/backend"
       ])
       .withExec(["chmod", "+x", "/workspace/backend"]);
 
@@ -101,7 +110,8 @@ export class MyceliumBuild {
 
   @func()
   async publishBackend(password: Secret, tag?: string): Promise<string> {
-      const platforms = ["linux/amd64", "linux/arm64"];
+      // const platforms = ["linux/amd64", "linux/arm64"];
+      const platforms = ["linux/arm64"];
       const backendJar = await this.containerBackend()
         .withExec(["sbt", "assembly"])
         .file("target/scala-3.7.4/backend-assembly-1.0.jar");
