@@ -3,6 +3,7 @@ package co.mycelium.endpoints
 import cats.effect.IO
 import co.mycelium.db.Repositories
 import co.mycelium.domain.*
+import co.mycelium.service.StationService
 import cron4s.CronExpr
 import cron4s.lib.javatime.javaTemporalInstance
 import org.http4s.HttpRoutes
@@ -87,72 +88,19 @@ object Stations extends TapirSchemas {
     )
     .options
 
-  def routes(repos: Repositories[IO]): HttpRoutes[IO] = {
+  def routes(svc: StationService[IO]): HttpRoutes[IO] = {
 
-    val list =
-      endpoints.list.serverLogic(at => _ => repos.stations.listByUserId(at.sub).map(Right(_)))
-
-    val add = endpoints.add.serverLogic { at => insert =>
-      val id      = UUID.randomUUID()
-      val created = Instant.now()
-      val station = insert.toStation(id, created, at.sub)
-
-      repos.stations.insert(station, created).map(Right(_))
-    }
-
-    val delete =
-      endpoints.delete.serverLogic(at => id => repos.stations.delete(id, at.sub).as(Right(())))
-
-    val checkin = endpoints.checkIn.serverLogic { at =>
-      { case (id, measurements) =>
-        for {
-          stationOpt <- repos.stations.findById(id, at.sub)
-          _          <- repos.measurements.insertMany(id, measurements)
-        } yield Right(Watering(None))
-      }
-    }
-
-    val watered = endpoints.watered.serverLogic { at =>
-      { case (id, request) =>
-        request.watering match {
-          case Some(watered) =>
-            repos.stationLog
-              .insert(StationLog(id, Instant.now(), StationEvent.Watered(watered)))
-              .as(Right(()))
-          case None => IO.unit.as(Right(()))
-        }
-      }
-    }
-
-    val log = endpoints.log.serverLogic { at =>
-      { case (id, page) =>
-        repos.stationLog.listByStation(id, page.getOrElse(0L) * 30).map(Right(_))
-      }
-    }
-
-    val details = endpoints.details.serverLogic { at =>
-      { case (id, period) =>
-        repos.stations.findById(id, at.sub).flatMap {
-          case Some(station) =>
-            repos.measurements
-              .avg(id, period.getOrElse(MeasurementPeriod.LastTwentyFourHours))
-              .map(measurements => Right(StationDetails(station, measurements)))
-          case None =>
-            IO.delay(Left(()))
-        }
-      }
-    }
-
-    val update = endpoints.update.serverLogic { at =>
-      { case (id, update) =>
-        repos.stations.update(id, at.sub, update, Instant.now()).as(Right(()))
-      }
-    }
-
-    val routes = List(list, add, delete, log, watered, checkin, details, update)
+    val list = endpoints.list.serverLogic(at => _ => svc.list(at.sub).map(Right(_)))
+    val add = endpoints.add.serverLogic(at => insert => svc.add(at.sub, insert).map(Right(_)))
+    val delete = endpoints.delete.serverLogic(at => id => svc.delete(at.sub, id).as(Right(())))
+    val checkin = endpoints.checkIn.serverLogic(at => (id, measurements) => svc.checkin(at.sub, id, measurements).map(Right(_)))
+    val update = endpoints.update.serverLogic(at => (id, update) => svc.update(at.sub, id, update).map(Right(_)))
+    val details = endpoints.details.serverLogic(at => (id, period) => svc.details(at.sub, period, id))
+    val watered = endpoints.watered.serverLogic(at => (id, request) => svc.watered(at.sub, id, request).map(Right(_)))
+    val log = endpoints.log.serverLogic(at => (id, page) => svc.getLogs(at.sub, id, page).map(Right(_)))
 
     Http4sServerInterpreter(serverOptions)
-      .toRoutes(routes)
+      .toRoutes(List(list, add, delete, log, watered, checkin, details, update))
   }
 }
 

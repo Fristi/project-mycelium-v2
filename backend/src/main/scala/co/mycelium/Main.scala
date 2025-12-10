@@ -2,6 +2,7 @@ package co.mycelium
 
 import cats.data.Kleisli
 import cats.effect.*
+import cats.effect.std.UUIDGen
 import cats.implicits.*
 import co.mycelium.db.Repositories
 import co.mycelium.endpoints.{Avatar, Stations}
@@ -21,6 +22,7 @@ import sttp.tapir.server.interceptor.cors
 import org.http4s.server.middleware.CORSPolicy
 import co.mycelium.AppConfig
 import co.mycelium.Transactors
+import co.mycelium.service.StationServiceImpl
 
 object Main extends IOApp {
 
@@ -31,8 +33,10 @@ object Main extends IOApp {
 
   def httpApp(repositories: Repositories[IO]): HttpApp[IO] = {
 
+    val stationService = new StationServiceImpl[IO](UUIDGen[IO], Clock[IO], repositories)
+
     val server = Router(
-      "api"    -> Stations.routes(repositories),
+      "api"    -> Stations.routes(stationService),
       "avatar" -> Avatar.routes
     )
     val files  = fileService[IO](FileService.Config("."))

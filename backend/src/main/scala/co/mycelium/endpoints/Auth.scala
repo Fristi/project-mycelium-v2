@@ -4,20 +4,15 @@ import cats.data.EitherT
 import cats.effect.IO
 import com.auth0.jwk.JwkProviderBuilder
 import io.circe.Decoder
-import io.circe.generic.semiauto.deriveDecoder
-import pdi.jwt._
+import pdi.jwt.*
 
 import java.util.concurrent.TimeUnit
 import scala.util.Try
 
 object Auth {
-  final case class AccessToken(sub: String)
+  final case class AccessToken(sub: String) derives Decoder
 
-  object AccessToken {
-    implicit val decoder: Decoder[AccessToken] = deriveDecoder
-  }
-
-  val jwkUrl      = sys.env.get("AUTH0_BASE_URL").getOrElse("https://mycelium-greens.eu.auth0.com")
+  val jwkUrl      = sys.env.getOrElse("AUTH0_BASE_URL", "https://mycelium-greens.eu.auth0.com")
   val jwkProvider = new JwkProviderBuilder(jwkUrl)
     .cached(3600, 3600, TimeUnit.SECONDS)
     .build()

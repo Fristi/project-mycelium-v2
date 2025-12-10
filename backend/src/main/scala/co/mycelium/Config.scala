@@ -26,14 +26,14 @@ object AppConfig {
       env("PG_USER").as[String].default("postgres"),
       env("PG_PASS").as[String].secret.default(Secret("postgres")),
       env("PG_DB").as[String].default("mycelium")
-    ).parMapN(DbConfig)
+    ).parMapN(DbConfig.apply)
 
   private val blobConfig =
     (
       env("S3_HOST").as[String].default("http://127.0.0.1:9000"),
       env("S3_ACCESS_KEY").as[String].default("minio"),
       env("S3_SECRET_KEY").as[String].secret.default(Secret("miniominio"))
-    ).parMapN(S3BlobConfig)
+    ).parMapN(S3BlobConfig.apply)
 
   val config: ConfigValue[Effect, AppConfig] = (dbConfig, blobConfig).parMapN(AppConfig.apply)
 }
