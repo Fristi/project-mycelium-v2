@@ -88,7 +88,7 @@ export class MyceliumBuild {
         "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
         "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
         "--trace-class-initialization=ch.qos.logback.classic.Logger",
-        "--trace-object-instantiation=ch.qos.logback.core.AsyncAppenderBase$Worker",
+        "--trace-object-instantiation=ch.qos.logback.core.AsyncAppenderBase$Worker,java.util.Random",
         "--initialize-at-run-time=io.netty",
         "--initialize-at-run-time=org.postgresql,org.postgresql.Driver,org.postgresql.jdbc",
         "-cp",

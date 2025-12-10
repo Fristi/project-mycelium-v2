@@ -1,5 +1,8 @@
 package co.mycelium.domain
 
+import cats.Eq
+import cats.derived.*
+import org.typelevel.cats.time.*
 import io.circe.{Decoder, Encoder}
 
 import java.time.Instant
@@ -13,4 +16,5 @@ final case class StationMeasurement(
     soilPf: Double,
     tankPf: Double
 ) derives Encoder.AsObject,
-      Decoder
+      Decoder,
+      Eq

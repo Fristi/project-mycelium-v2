@@ -1,11 +1,13 @@
 package co.mycelium.service
 
+import blobstore.s3.S3Store
 import cats.Monad
 import cats.effect.Clock
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import co.mycelium.db.Repositories
 import co.mycelium.domain.*
+import fs2.Stream
 
 import java.util.UUID
 
@@ -22,6 +24,7 @@ trait StationService[F[_]] {
   ): F[Either[Unit, StationDetails]]
   def watered(userId: String, stationID: UUID, watering: Watering): F[Unit]
   def getLogs(userId: String, stationID: UUID, page: Option[Long]): F[List[StationLog]]
+  def classify(userId: String, stationID: UUID, image: Stream[F, Byte]): F[Unit]
 }
 
 final class StationServiceImpl[F[_]: Monad](
@@ -88,4 +91,7 @@ final class StationServiceImpl[F[_]: Monad](
 
   override def getLogs(userId: String, stationID: UUID, page: Option[Long]): F[List[StationLog]] =
     repos.stationLog.listByStation(stationID, page.getOrElse(0L))
+
+  override def classify(userId: String, stationID: UUID, image: Stream[F, Byte]): F[Unit] =
+    ???
 }
