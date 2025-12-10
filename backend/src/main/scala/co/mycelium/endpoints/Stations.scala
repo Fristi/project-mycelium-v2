@@ -1,30 +1,24 @@
 package co.mycelium.endpoints
 
 import cats.effect.IO
-import co.mycelium.db.Repositories
 import co.mycelium.domain.*
 import co.mycelium.service.StationService
 import cron4s.CronExpr
-import cron4s.lib.javatime.javaTemporalInstance
 import org.http4s.HttpRoutes
+import sttp.capabilities.fs2.Fs2Streams
+import sttp.model.headers.Origin
 import sttp.tapir.*
 import sttp.tapir.generic.Configuration
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.*
-import sttp.tapir.server.http4s.Http4sServerInterpreter
+import sttp.tapir.server.http4s.{Http4sServerInterpreter, Http4sServerOptions}
+import sttp.tapir.server.interceptor.cors.{CORSConfig, CORSInterceptor}
+import sttp.tapir.server.model.ValuedEndpointOutput
 
 import java.time.Instant
 import java.util.UUID
-import scala.concurrent.duration.FiniteDuration
-import sttp.tapir.server.http4s.Http4sServerOptions
-import sttp.tapir.server.model.ValuedEndpointOutput
-import sttp.tapir.server.interceptor.log.ServerLog
-import sttp.tapir.server.interceptor.log.DefaultServerLog
-import sttp.tapir.server.interceptor.cors.CORSInterceptor
-import sttp.tapir.server.interceptor.cors.CORSConfig
-import sttp.model.headers.Origin
-
 import scala.annotation.experimental
+import scala.concurrent.duration.FiniteDuration
 
 @experimental
 object Stations extends TapirSchemas {
@@ -62,7 +56,14 @@ object Stations extends TapirSchemas {
       .name("getStationLog")
       .out(jsonBody[List[StationLog]])
 
-    val all = Set(list, add, details, update, delete, checkIn, watered, log)
+    val upload = stations
+      .in(path[UUID]("stationId"))
+      .in("upload")
+      .in(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByte, CodecFormat.OctetStream()))
+      .name("uploadImage")
+      .out(jsonBody[List[PlantProfile]])
+
+    val all = Set(list, add, details, update, delete, checkIn, watered, log, upload)
   }
 
   def toMyceliumError(error: String): ValuedEndpointOutput[?] =
@@ -90,14 +91,27 @@ object Stations extends TapirSchemas {
 
   def routes(svc: StationService[IO]): HttpRoutes[IO] = {
 
-    val list = endpoints.list.serverLogic(at => _ => svc.list(at.sub).map(Right(_)))
-    val add = endpoints.add.serverLogic(at => insert => svc.add(at.sub, insert).map(Right(_)))
-    val delete = endpoints.delete.serverLogic(at => id => svc.delete(at.sub, id).as(Right(())))
-    val checkin = endpoints.checkIn.serverLogic(at => (id, measurements) => svc.checkin(at.sub, id, measurements).map(Right(_)))
-    val update = endpoints.update.serverLogic(at => (id, update) => svc.update(at.sub, id, update).map(Right(_)))
-    val details = endpoints.details.serverLogic(at => (id, period) => svc.details(at.sub, period, id))
-    val watered = endpoints.watered.serverLogic(at => (id, request) => svc.watered(at.sub, id, request).map(Right(_)))
-    val log = endpoints.log.serverLogic(at => (id, page) => svc.getLogs(at.sub, id, page).map(Right(_)))
+    val list    = endpoints.list.serverLogic(at => _ => svc.list(at.sub).map(Right(_)))
+    val add     = endpoints.add.serverLogic(at => insert => svc.add(at.sub, insert).map(Right(_)))
+    val delete  = endpoints.delete.serverLogic(at => id => svc.delete(at.sub, id).as(Right(())))
+    val checkin = endpoints.checkIn.serverLogic(at =>
+      (id, measurements) => svc.checkin(at.sub, id, measurements).map(Right(_))
+    )
+    val update = endpoints.update.serverLogic(at =>
+      (id, update) => svc.update(at.sub, id, update).map(Right(_))
+    )
+    val details =
+      endpoints.details.serverLogic(at => (id, period) => svc.details(at.sub, period, id))
+    val watered = endpoints.watered.serverLogic(at =>
+      (id, request) => svc.watered(at.sub, id, request).map(Right(_))
+    )
+    val log =
+      endpoints.log.serverLogic(at => (id, page) => svc.getLogs(at.sub, id, page).map(Right(_)))
+
+    val upload =
+      endpoints.upload.serverLogic(at =>
+        (id, stream) => svc.uploadFullPlantImage(at.sub, id, stream).map(Right(_))
+      )
 
     Http4sServerInterpreter(serverOptions)
       .toRoutes(List(list, add, delete, log, watered, checkin, details, update))

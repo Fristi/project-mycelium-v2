@@ -1,12 +1,15 @@
 package co.mycelium.service
 
+import blobstore.Store
 import blobstore.s3.S3Store
+import blobstore.url.{Authority, Url}
 import cats.Monad
-import cats.effect.Clock
+import cats.effect.{Clock, Concurrent}
 import cats.effect.std.UUIDGen
 import cats.implicits.*
 import co.mycelium.db.Repositories
 import co.mycelium.domain.*
+import co.mycelium.ports.*
 import fs2.Stream
 
 import java.util.UUID
@@ -24,13 +27,21 @@ trait StationService[F[_]] {
   ): F[Either[Unit, StationDetails]]
   def watered(userId: String, stationID: UUID, watering: Watering): F[Unit]
   def getLogs(userId: String, stationID: UUID, page: Option[Long]): F[List[StationLog]]
-  def classify(userId: String, stationID: UUID, image: Stream[F, Byte]): F[Unit]
+  def uploadFullPlantImage(
+      userId: String,
+      stationID: UUID,
+      image: Stream[F, Byte]
+  ): F[List[PlantProfile]]
+  def getFullPlantImage(userId: String, stationID: UUID): Stream[F, Byte]
 }
 
-final class StationServiceImpl[F[_]: Monad](
+final class StationServiceImpl[F[_]: {Monad, Concurrent}](
     uuidGen: UUIDGen[F],
     clock: Clock[F],
-    repos: Repositories[F]
+    repos: Repositories[F],
+    s3: S3Store[F],
+    plantClassifier: PlantClassifier[F],
+    plantProfiler: PlantProfiler[F]
 ) extends StationService[F] {
 
   override def checkin(
@@ -92,6 +103,26 @@ final class StationServiceImpl[F[_]: Monad](
   override def getLogs(userId: String, stationID: UUID, page: Option[Long]): F[List[StationLog]] =
     repos.stationLog.listByStation(stationID, page.getOrElse(0L))
 
-  override def classify(userId: String, stationID: UUID, image: Stream[F, Byte]): F[Unit] =
-    ???
+  private def mkUrl(uuid: UUID) =
+    Url("s3", Authority.unsafe("mycelium"), blobstore.url.Path(s"$uuid"))
+
+  override def uploadFullPlantImage(
+      userId: String,
+      stationID: UUID,
+      image: Stream[F, Byte]
+  ): F[List[PlantProfile]] = {
+
+    def classify: F[List[PlantProfile]] = for {
+      possibleNames    <- plantClassifier.classifyPlant(image)
+      possibleProfiles <- plantProfiler.getProfilesForPlant(possibleNames)
+    } yield possibleProfiles
+
+    def putInBlobstore: F[Unit] =
+      image.through(s3.put(mkUrl(stationID), true)).compile.drain.void
+
+    classify <* putInBlobstore
+  }
+
+  override def getFullPlantImage(userId: String, stationID: UUID): Stream[F, Byte] =
+    s3.get(mkUrl(stationID))
 }

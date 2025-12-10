@@ -1,26 +1,14 @@
 package co.mycelium.adapters
 
-import cats.effect.{IO, Resource}
+import cats.Applicative
 import co.mycelium.domain.{Interval, PlantProfile, PlantProfileVariables}
 import co.mycelium.ports.PlantProfiler
-import sttp.client4.httpclient.cats.HttpClientCatsBackend
-import weaver.IOSuite
 
-object OpenPlantBookPlantProfilerTest extends IOSuite {
-  override type Res = PlantProfiler[IO]
-
-  override def sharedResource: Resource[IO, PlantProfiler[IO]] =
-    HttpClientCatsBackend
-      .resource[IO]()
-      .map(backend =>
-        new OpenPlantBookPlantProfiler[IO](System.getenv("OPENPLANTBOOK_KEY"), backend)
-      )
-
-  test("should get profiles") { client =>
-    for {
-      results <- client.getProfilesForPlant(List("Schefflera"))
-      expected = List(
-        PlantProfile (
+case class ConstantPlantProfiler[F[_]: Applicative]() extends PlantProfiler[F] {
+  override def getProfilesForPlant(names: List[String]): F[List[PlantProfile]] =
+    Applicative[F].pure(
+      List(
+        PlantProfile(
           "Schefflera elegantissima",
           PlantProfileVariables(
             Interval(2500, 4500),
@@ -87,6 +75,5 @@ object OpenPlantBookPlantProfilerTest extends IOSuite {
           )
         )
       )
-    } yield expect.same(results, expected)
-  }
+    )
 }

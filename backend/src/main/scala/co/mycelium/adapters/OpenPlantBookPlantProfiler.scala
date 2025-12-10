@@ -2,7 +2,8 @@ package co.mycelium.adapters
 
 import cats.effect.Sync
 import cats.implicits.*
-import co.mycelium.ports.{Interval, PlantProfile, PlantProfileVariables, PlantProfiler}
+import co.mycelium.domain.{Interval, PlantProfile, PlantProfileVariables}
+import co.mycelium.ports.*
 import io.circe.Decoder
 import sttp.client4.*
 import sttp.client4.circe.*
