@@ -1,17 +1,17 @@
 package co.mycelium
 
 import cats.data.Kleisli
-import cats.effect._
-import cats.implicits._
+import cats.effect.*
+import cats.implicits.*
 import co.mycelium.db.Repositories
 import co.mycelium.endpoints.{Avatar, Stations}
-import com.comcast.ip4s._
+import com.comcast.ip4s.*
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.{Router, Server}
 import org.http4s.server.middleware.{CORS, CORSConfig, ErrorAction, ErrorHandling}
-import org.http4s.server.staticcontent._
+import org.http4s.server.staticcontent.*
 import org.http4s.{HttpApp, Request, Response}
-import org.typelevel.log4cats.LoggerFactory
+import org.typelevel.log4cats.{Logger, LoggerFactory}
 import org.typelevel.log4cats.slf4j.Slf4jFactory
 
 import java.net.URI
@@ -41,31 +41,23 @@ object Main extends IOApp {
     routes
   }
 
-  private def errorHandling(route: Kleisli[IO, Request[IO], Response[IO]]) =
+  private def errorHandling(log: Logger[IO])(route: Kleisli[IO, Request[IO], Response[IO]]) =
     ErrorHandling.Recover.total(
-      ErrorAction.log(
-        route,
-        messageFailureLogAction = (t, msg) =>
-          IO.println(msg) >>
-            IO.println(t),
-        serviceErrorLogAction = (t, msg) =>
-          IO.println(msg) >>
-            IO.delay(t.printStackTrace())
-      )
+      ErrorAction.log(route, (t, msg) => log.warn(t)(msg), (t, msg) => log.error(t)(msg))
     )
 
   val app: Resource[IO, Server] =
     for {
       cfg <- Resource.eval(AppConfig.config.load[IO])
-      tx  <- Transactors.pg[IO](cfg.db)
-      repos = Repositories.fromTransactor(tx)
-      app = errorHandling(httpApp(repos))
-      app_logging = org.http4s.server.middleware.Logger.httpApp(true, true)(app)
+      tx  <- Transactors.pg[IO](cfg.db, loggerFactory.getLoggerFromName("Doobie"))
+      repos        = Repositories.fromTransactor(tx)
+      errorLogging = loggerFactory.getLoggerFromName("Http4s")
+      app          = errorHandling(errorLogging)(httpApp(repos))
       server <- EmberServerBuilder
         .default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(port"8080")
-        .withHttpApp(app_logging)
+        .withHttpApp(app)
         .build
     } yield server
 }

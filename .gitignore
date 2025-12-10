@@ -28,6 +28,7 @@ edge-client-backend
 **/.bloop
 **/.metals
 **/.bsp
+**/.scala-build
 **/data
 **/out/
 backend/project/metals.sbt

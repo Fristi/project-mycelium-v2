@@ -12,7 +12,7 @@ given Codec[FiniteDuration] = Codec.from(
   Decoder.decodeString.emap { s =>
     Duration(s) match {
       case fd: FiniteDuration => Right(fd)
-      case _ => Left(s"Invalid FiniteDuration: $s")
+      case _                  => Left(s"Invalid FiniteDuration: $s")
     }
   },
   Encoder.encodeString.contramap(_.toString)

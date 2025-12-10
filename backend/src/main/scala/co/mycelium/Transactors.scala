@@ -1,44 +1,40 @@
 package co.mycelium
 
 import cats.Applicative
-import cats.effect.{Async, IO, Resource}
-import retry._
-import retry.RetryPolicies._
-
-import javax.sql.DataSource
-import scala.concurrent.duration.DurationInt
-import doobie.Transactor
-import java.sql.Connection
-import org.typelevel.keypool.Pool
-import cats.effect.Sync
-import java.io.PrintWriter
-import cats.effect.Temporal
+import cats.effect.{Resource, Temporal}
+import co.mycelium.{DbConfig, PooledTransactor}
 import doobie.WeakAsync
-import co.mycelium.PooledTransactor.pool
-import java.util.logging.Logger
-import java.sql.SQLException
-import co.mycelium.DbConfig
-import co.mycelium.PooledTransactor
+import org.typelevel.log4cats.Logger
+import retry.*
+import retry.RetryPolicies.*
+
+import scala.concurrent.duration.DurationInt
 
 object Transactors {
-  def pg[F[_]: Temporal : WeakAsync](cfg: DbConfig): Resource[F, PooledTransactor[F]] = {
-    type ResourceM[A] = Resource[F, A]
+  private def policy[F[_]: Applicative]: RetryPolicy[F] =
+    limitRetries[F](10) join exponentialBackoff[F](200.milliseconds)
 
-    def policy[F[_]: Applicative] =
-      limitRetries[F](10) join exponentialBackoff[F](200.milliseconds)
+  private def handleError[F[_]](
+      log: Logger[F]
+  )(error: Throwable, retryDetails: RetryDetails): Resource[F, Unit] =
+    Resource.eval(log.error(error)(s"Retried connecting to database: $retryDetails"))
 
-    def handleError(error: Throwable, retryDetails: RetryDetails): Resource[F, Unit] = 
-      Resource.eval(Sync[F].blocking(error.printStackTrace()))
+//  private def retryingPoolTransactor[F[_], E](log: Logger[F], pt: Resource[F, PooledTransactor[F]])(given M: MonadError[F, E], S: Sleep[F]) =
+//    retryingOnAllErrors[PooledTransactor[F]].apply(policy, (err, details) => handleError(log)(err, details))
 
+  def pg[F[_]: {Temporal, WeakAsync}](
+      cfg: DbConfig,
+      log: Logger[F]
+  ): Resource[F, PooledTransactor[F]] = {
     val pooledTransactor = PooledTransactor.pool(
-        s"jdbc:postgresql://${cfg.host}:${cfg.port}/${cfg.database}", 
-        cfg.username,
-        cfg.password.value,
-        10, 
-        scala.concurrent.ExecutionContext.global
-      )
+      s"jdbc:postgresql://${cfg.host}:${cfg.port}/${cfg.database}",
+      cfg.username,
+      cfg.password.value,
+      cfg.maxConnections,
+      scala.concurrent.ExecutionContext.global,
+      log
+    )
 
-    // retryingOnAllErrors.apply[ResourceM, Throwable](policy, handleError)()
     pooledTransactor
   }
 

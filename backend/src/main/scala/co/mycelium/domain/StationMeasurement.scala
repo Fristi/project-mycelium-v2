@@ -12,4 +12,5 @@ final case class StationMeasurement(
     lux: Double,
     soilPf: Double,
     tankPf: Double
-)  derives Encoder.AsObject, Decoder
+) derives Encoder.AsObject,
+      Decoder

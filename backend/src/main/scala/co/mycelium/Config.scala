@@ -6,6 +6,7 @@ import cats.implicits._
 final case class DbConfig(
     host: String,
     port: Int,
+    maxConnections: Int,
     username: String,
     password: Secret[String],
     database: String
@@ -21,6 +22,7 @@ object AppConfig {
     (
       env("PG_HOST").as[String].default("localhost"),
       env("PG_PORT").as[Int].default(5432),
+      env("PG_MAX_CONNECTIONS").as[Int].default(10),
       env("PG_USER").as[String].default("postgres"),
       env("PG_PASS").as[String].secret.default(Secret("postgres")),
       env("PG_DB").as[String].default("mycelium")

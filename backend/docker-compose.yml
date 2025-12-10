@@ -9,7 +9,7 @@ services:
       - 5432:5432
 
   api:
-    image: markdj/mycelium-backend:latest
+    image: markdj/mycelium-backend:dev-1de12da6a27c9d283155bcb734c23e4d74fccde4
     environment:
       PG_HOST: timescaledb
     ports:
