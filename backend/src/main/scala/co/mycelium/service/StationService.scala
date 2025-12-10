@@ -111,16 +111,12 @@ final class StationServiceImpl[F[_]: {Monad, Concurrent}](
       stationID: UUID,
       image: Stream[F, Byte]
   ): F[List[PlantProfile]] = {
+    def image_ = image.observeAsync(256)(s3.put(mkUrl(stationID), true).andThen(_.drain))
 
-    def classify: F[List[PlantProfile]] = for {
-      possibleNames    <- plantClassifier.classifyPlant(image)
+    for {
+      possibleNames    <- plantClassifier.classifyPlant(image_)
       possibleProfiles <- plantProfiler.getProfilesForPlant(possibleNames)
     } yield possibleProfiles
-
-    def putInBlobstore: F[Unit] =
-      image.through(s3.put(mkUrl(stationID), true)).compile.drain.void
-
-    classify <* putInBlobstore
   }
 
   override def getFullPlantImage(userId: String, stationID: UUID): Stream[F, Byte] =

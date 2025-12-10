@@ -56,7 +56,7 @@ object Stations extends TapirSchemas {
       .name("getStationLog")
       .out(jsonBody[List[StationLog]])
 
-    val upload = stations
+    val upload = stations.post
       .in(path[UUID]("stationId"))
       .in("upload")
       .in(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByte, CodecFormat.OctetStream()))
@@ -114,7 +114,7 @@ object Stations extends TapirSchemas {
       )
 
     Http4sServerInterpreter(serverOptions)
-      .toRoutes(List(list, add, delete, log, watered, checkin, details, update))
+      .toRoutes(List(list, add, delete, log, watered, checkin, details, update, upload))
   }
 }
 
