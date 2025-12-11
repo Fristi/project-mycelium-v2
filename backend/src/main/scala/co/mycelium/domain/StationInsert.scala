@@ -8,7 +8,8 @@ import java.util.UUID
 final case class StationInsert(
     mac: String,
     name: String
-)  derives Encoder.AsObject, Decoder {
+) derives Encoder.AsObject,
+      Decoder {
   def toStation(id: UUID, created: Instant, userId: String): Station =
     Station(
       id = id,

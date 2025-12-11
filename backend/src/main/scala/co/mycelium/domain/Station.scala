@@ -14,4 +14,5 @@ final case class Station(
     userId: String,
     created: Instant,
     updated: Option[Instant]
-) derives Encoder.AsObject, Decoder
+) derives Encoder.AsObject,
+      Decoder

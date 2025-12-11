@@ -1,40 +1,39 @@
 package co.mycelium.db
 
-import weaver._
-import doobie.weaver._
-import doobie._
-import doobie.implicits._
-import cats.effect.kernel.Resource
 import cats.effect.IO
-import co.mycelium.Transactors
-import co.mycelium.DbConfig
+import cats.effect.kernel.Resource
 import ciris.Secret
-import java.util.UUID
-import co.mycelium.domain.StationInsert
+import co.mycelium.adapters.db.{DoobieStationMeasurementRepository, DoobieStationRepository}
+import co.mycelium.{Database, DbConfig}
+import co.mycelium.domain.{MeasurementPeriod, StationInsert, StationMeasurement, StationUpdate}
+import doobie.weaver.*
+import weaver.*
+import doobie.*
+import doobie.implicits.*
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+
 import java.time.Instant
-import co.mycelium.domain.StationUpdate
-import co.mycelium.domain.MeasurementPeriod
-import co.mycelium.domain.StationMeasurement
+import java.util.UUID
 
 object DoobieStationMeasurementRepositoryTest extends IOSuite with IOChecker {
 
   override type Res = Transactor[IO]
 
-  val config  = DbConfig("localhost", 5432, "postgres", Secret("postgres"), "mycelium")
   val repo    = DoobieStationMeasurementRepository
   val now     = Instant.parse("2025-07-29T00:10:00Z")
   val insert  = StationInsert("00:00:00:00:00:00", "Unnamed")
   val station = insert.toStation(UUID.randomUUID(), now, "some-user-id")
 
   override def sharedResource: Resource[IO, Res] =
-    Transactors.pg[IO](config).map(tx => Transactor.after.set(tx, HC.rollback))
+    DoobieResource.setup
 
   test("average should work") { implicit tx =>
     val timebucket = Instant.parse("2025-07-29T00:00:00Z")
 
     val program = for {
       id <- DoobieStationRepository.insert(station, now)
-      _ <- DoobieStationMeasurementRepository.insertMany(
+      _  <- DoobieStationMeasurementRepository.insertMany(
         id,
         List(
           StationMeasurement(now, 12.5, 20.5, 65.0, 100.0, 2.5, 3.0),
@@ -51,10 +50,7 @@ object DoobieStationMeasurementRepositoryTest extends IOSuite with IOChecker {
       )
       avg <- DoobieStationMeasurementRepository.avg(id, MeasurementPeriod.LastMonth)
     } yield {
-      assert(
-        avg == List(StationMeasurement(timebucket, 12.95, 22.75, 62.75, 145.0, 2.95, 3.45)),
-        "Average should match!"
-      )
+      expect.eql(avg, List(StationMeasurement(timebucket, 12.95, 22.75, 62.75, 145.0, 2.95, 3.45)))
     }
 
     program.transact(tx)

@@ -79,6 +79,7 @@ export class MyceliumBuild {
         "--no-fallback",
         "--static",
         "--libc=musl",
+        "--install-exit-handlers",
         "--initialize-at-build-time",
         "--report-unsupported-elements-at-runtime",
         "-H:IncludeResources=META-INF/services/.*,placeholder\\.png,logback\\.xml",
@@ -88,8 +89,7 @@ export class MyceliumBuild {
         "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
         "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
         "--trace-class-initialization=ch.qos.logback.classic.Logger",
-        "--trace-object-instantiation=ch.qos.logback.core.AsyncAppenderBase$Worker",
-        "--initialize-at-run-time=io.netty",
+        "--trace-object-instantiation=ch.qos.logback.core.AsyncAppenderBase$Worker,java.util.Random",
         "--initialize-at-run-time=org.postgresql,org.postgresql.Driver,org.postgresql.jdbc",
         "-cp",
         "/workspace/backend.jar",
@@ -109,7 +109,7 @@ export class MyceliumBuild {
   }
 
   @func()
-  async publishBackend(password: Secret, tag?: string): Promise<string> {
+  async publishBackendGraal(password: Secret, tag?: string): Promise<string> {
       // const platforms = ["linux/amd64", "linux/arm64"];
       const platforms = ["linux/arm64"];
       const backendJar = await this.containerBackend()
@@ -122,6 +122,16 @@ export class MyceliumBuild {
         .container()
         .withRegistryAuth("docker.io", "markdj", password)
         .publish(`markdj/mycelium-backend:${tag ?? "latest"}`, { platformVariants: containers });
+  }
+
+  @func()
+  publishBackend(password: Secret, tag?: string): Promise<string> {
+    return this
+      .containerBackend()
+      .withEnvVariable("JIB_TARGET_IMAGE_USERNAME", "markdj")
+      .withSecretVariable("JIB_TARGET_IMAGE_PASSWORD", password)
+      .withExec(["sbt", `-DimageTag=${tag ?? "latest"}`, "jibImageBuild"])
+      .stdout();
   }
 
   @func()

@@ -11,4 +11,4 @@ object StationEvent:
   case class Watered(period: FiniteDuration) extends StationEvent
 
   given Encoder.AsObject[StationEvent] = Encoder.AsObject.derived
-  given Decoder[StationEvent] = Decoder.derived
+  given Decoder[StationEvent]          = Decoder.derived
