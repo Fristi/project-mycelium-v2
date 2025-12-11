@@ -3,7 +3,6 @@ package co.mycelium.endpoints
 import cats.effect.IO
 import co.mycelium.domain.*
 import co.mycelium.service.StationService
-import cron4s.CronExpr
 import org.http4s.HttpRoutes
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.model.headers.Origin
@@ -190,7 +189,6 @@ trait TapirSchemas {
   implicit val customConfiguration: Configuration =
     Configuration.default.withDiscriminator("_type")
 
-  implicit val schemaCronExpr: Schema[CronExpr]             = Schema.string
   implicit val schemaFiniteDuration: Schema[FiniteDuration] = Schema.string
 
   implicit def schemaForInterval[A: Schema]: Schema[Interval[A]] = Schema.derived[Interval[A]]

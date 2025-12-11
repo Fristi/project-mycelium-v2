@@ -12,7 +12,6 @@ libraryDependencies ++= Seq(
   "org.typelevel"                 %% "keypool"                    % "0.4.10",
   "org.typelevel"                 %% "kittens"                    % "3.5.0",
   "org.typelevel"                 %% "cats-tagless-core"          % "0.16.3",
-  "com.github.alonsodomin.cron4s" %% "cron4s-core"                % "0.8.2",
   "org.http4s"                    %% "http4s-dsl"                 % versions.http4s,
   "org.http4s"                    %% "http4s-ember-server"        % versions.http4s,
   "com.softwaremill.sttp.tapir"   %% "tapir-http4s-server"        % versions.tapir,
