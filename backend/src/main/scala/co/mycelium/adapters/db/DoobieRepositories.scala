@@ -4,6 +4,7 @@ import co.mycelium.ports.{
   Repositories,
   StationLogRepository,
   StationMeasurementRepository,
+  StationProfileRepository,
   StationRepository
 }
 import doobie.ConnectionIO
@@ -15,4 +16,6 @@ object DoobieRepositories extends Repositories[ConnectionIO] {
     DoobieStationRepository
   override def measurements: StationMeasurementRepository[ConnectionIO] =
     DoobieStationMeasurementRepository
+  override def stationProfile: StationProfileRepository[ConnectionIO] =
+    DoobieStationProfileRepository
 }

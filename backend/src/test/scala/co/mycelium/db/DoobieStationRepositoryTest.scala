@@ -19,14 +19,11 @@ object DoobieStationRepositoryTest extends IOSuite with IOChecker {
 
   override type Res = Transactor[IO]
 
-  val log = Slf4jLogger.getLoggerFromName[IO]("Doobie")
-
-  val config = DbConfig("localhost", 5432, 1, "postgres", Secret("postgres"), "mycelium")
-  val repo   = DoobieStationRepository
-  val now    = Instant.now()
+  val repo = DoobieStationRepository
+  val now  = Instant.now()
 
   override def sharedResource: Resource[IO, Res] =
-    Database.transactor[IO](config, log).map(tx => Transactor.after.set(tx, HC.rollback))
+    DoobieResource.setup
 
   test("inserting the station with the same mac should return same id") { implicit tx =>
     val insert  = StationInsert("00:00:00:00:00:00", "Unnamed")

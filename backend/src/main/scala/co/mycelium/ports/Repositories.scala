@@ -4,11 +4,20 @@ import cats.effect.kernel.MonadCancelThrow
 import cats.tagless.{Derive, FunctorK}
 import co.mycelium.adapters.db.DoobieRepositories
 import co.mycelium.domain.*
-import doobie.Transactor
+import doobie.{Transactor}
 
 import java.time.Instant
 import java.util.UUID
 import scala.annotation.experimental
+
+trait StationProfileRepository[F[_]] {
+  def upsert(profile: PlantProfile, stationId: UUID): F[Int]
+  def getPlantProfilesByUserId(userId: String): F[List[StationPlantProfile]]
+}
+
+object StationProfileRepository {
+  implicit val functorK: FunctorK[StationProfileRepository] = Derive.functorK
+}
 
 trait StationLogRepository[F[_]] {
   def insert(log: StationLog): F[Int]
@@ -44,6 +53,7 @@ object StationRepository {
 
 trait Repositories[F[_]] {
   def stationLog: StationLogRepository[F]
+  def stationProfile: StationProfileRepository[F]
   def stations: StationRepository[F]
   def measurements: StationMeasurementRepository[F]
 }

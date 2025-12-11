@@ -114,10 +114,12 @@ final class StationServiceImpl[F[_]: {Concurrent}](
   ): F[List[PlantProfile]] = {
     def image_ = image.observeAsync(256)(s3.put(mkUrl(stationID), true).andThen(_.drain))
 
-    for {
-      possibleNames    <- plantClassifier.classifyPlant(image_)
-      possibleProfiles <- plantProfiler.getProfilesForPlant(possibleNames)
-    } yield possibleProfiles
+    protect(userId, stationID) {
+      for {
+        possibleNames    <- plantClassifier.classifyPlant(image_)
+        possibleProfiles <- plantProfiler.getProfilesForPlant(possibleNames)
+      } yield possibleProfiles
+    }
   }
 
   override def viewAvatar(stationID: UUID): F[Stream[F, Byte]] = {
@@ -127,7 +129,15 @@ final class StationServiceImpl[F[_]: {Concurrent}](
     Monad[F].pure(bucket.orElse(placeHolder))
   }
 
-  override def getProfiles(userId: String): F[List[StationPlantProfile]] = ???
+  override def getProfiles(userId: String): F[List[StationPlantProfile]] =
+    repos.stationProfile.getPlantProfilesByUserId(userId)
 
-  override def setProfile(userId: String, stationID: UUID, profile: PlantProfile): F[Unit] = ???
+  override def setProfile(userId: String, stationID: UUID, profile: PlantProfile): F[Unit] =
+    protect(userId, stationID)(repos.stationProfile.upsert(profile, stationID).void)
+
+  private def protect[A](userId: String, stationID: UUID)(f: => F[A]): F[A] =
+    repos.stations.findById(stationID, userId).flatMap {
+      case Some(_) => f
+      case None    => Concurrent[F].raiseError(new Throwable("No access to this station"))
+    }
 }

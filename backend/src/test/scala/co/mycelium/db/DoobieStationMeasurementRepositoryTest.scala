@@ -20,16 +20,13 @@ object DoobieStationMeasurementRepositoryTest extends IOSuite with IOChecker {
 
   override type Res = Transactor[IO]
 
-  val log = Slf4jLogger.getLoggerFromName[IO]("Doobie")
-
-  val config  = DbConfig("localhost", 5432, 1, "postgres", Secret("postgres"), "mycelium")
   val repo    = DoobieStationMeasurementRepository
   val now     = Instant.parse("2025-07-29T00:10:00Z")
   val insert  = StationInsert("00:00:00:00:00:00", "Unnamed")
   val station = insert.toStation(UUID.randomUUID(), now, "some-user-id")
 
   override def sharedResource: Resource[IO, Res] =
-    Database.transactor[IO](config, log).map(tx => Transactor.after.set(tx, HC.rollback))
+    DoobieResource.setup
 
   test("average should work") { implicit tx =>
     val timebucket = Instant.parse("2025-07-29T00:00:00Z")
