@@ -5,8 +5,7 @@ import cats.data.Kleisli
 import cats.effect.*
 import cats.effect.std.UUIDGen
 import cats.implicits.*
-import co.mycelium.{AppConfig, Transactors}
-import co.mycelium.db.Repositories
+import co.mycelium.{AppConfig, Database}
 import co.mycelium.endpoints.Stations
 import co.mycelium.service.{StationService, StationServiceImpl}
 import co.mycelium.ports.*
@@ -47,7 +46,7 @@ object Main extends IOApp {
     )
 
   private def stationService(cfg: AppConfig): Resource[IO, StationService[IO]] = for {
-    tx              <- Transactors.pg[IO](cfg.db, loggerFactory.getLoggerFromName("Doobie"))
+    tx              <- Database.transactor[IO](cfg.db, loggerFactory.getLoggerFromName("Doobie"))
     plantClassifier <- PlantClassifier.fromConfig[IO](cfg.plantClassifier)
     plantProfiler   <- PlantProfiler.fromConfig[IO](cfg.plantProfiler)
     s3Client = client(cfg.blob)
@@ -70,6 +69,7 @@ object Main extends IOApp {
   val app: Resource[IO, Server] =
     for {
       cfg <- Resource.eval(AppConfig.config.load[IO])
+      _   <- Resource.eval(Database.flyway[IO](cfg.db))
       svc <- stationService(cfg)
       errorLogging = loggerFactory.getLoggerFromName("Http4s")
       app          = errorHandling(errorLogging)(httpApp(svc))

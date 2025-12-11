@@ -3,7 +3,8 @@ package co.mycelium.db
 import cats.effect.IO
 import cats.effect.kernel.Resource
 import ciris.Secret
-import co.mycelium.{DbConfig, Transactors}
+import co.mycelium.adapters.db.{DoobieStationMeasurementRepository, DoobieStationRepository}
+import co.mycelium.{Database, DbConfig}
 import co.mycelium.domain.{MeasurementPeriod, StationInsert, StationMeasurement, StationUpdate}
 import doobie.weaver.*
 import weaver.*
@@ -28,7 +29,7 @@ object DoobieStationMeasurementRepositoryTest extends IOSuite with IOChecker {
   val station = insert.toStation(UUID.randomUUID(), now, "some-user-id")
 
   override def sharedResource: Resource[IO, Res] =
-    Transactors.pg[IO](config, log).map(tx => Transactor.after.set(tx, HC.rollback))
+    Database.transactor[IO](config, log).map(tx => Transactor.after.set(tx, HC.rollback))
 
   test("average should work") { implicit tx =>
     val timebucket = Instant.parse("2025-07-29T00:00:00Z")

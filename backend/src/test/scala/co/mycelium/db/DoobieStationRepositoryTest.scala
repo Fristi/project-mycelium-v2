@@ -3,7 +3,8 @@ package co.mycelium.db
 import cats.effect.IO
 import cats.effect.kernel.Resource
 import ciris.Secret
-import co.mycelium.{DbConfig, Transactors}
+import co.mycelium.adapters.db.DoobieStationRepository
+import co.mycelium.{Database, DbConfig}
 import co.mycelium.domain.{StationInsert, StationUpdate}
 import doobie.weaver.*
 import weaver.*
@@ -25,7 +26,7 @@ object DoobieStationRepositoryTest extends IOSuite with IOChecker {
   val now    = Instant.now()
 
   override def sharedResource: Resource[IO, Res] =
-    Transactors.pg[IO](config, log).map(tx => Transactor.after.set(tx, HC.rollback))
+    Database.transactor[IO](config, log).map(tx => Transactor.after.set(tx, HC.rollback))
 
   test("inserting the station with the same mac should return same id") { implicit tx =>
     val insert  = StationInsert("00:00:00:00:00:00", "Unnamed")

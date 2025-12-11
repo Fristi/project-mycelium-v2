@@ -1,10 +1,11 @@
-package co.mycelium.db
+package co.mycelium.adapters.db
 
 import cats.{Applicative, Traverse}
 import cats.data.NonEmptyList
 import cats.tagless.{Derive, FunctorK}
 import cats.implicits.*
 import co.mycelium.domain.*
+import co.mycelium.ports.StationRepository
 import doobie.*
 import doobie.implicits.*
 import doobie.postgres.implicits.*
@@ -13,17 +14,7 @@ import java.time.Instant
 import java.util.UUID
 import scala.annotation.experimental
 
-trait StationRepository[F[_]] {
-  def insert(station: Station, on: Instant): F[UUID]
-  def listByUserId(userId: String): F[List[Station]]
-  def findById(id: UUID, userId: String): F[Option[Station]]
-  def delete(id: UUID, userId: String): F[Int]
-  def update(id: UUID, userId: String, update: StationUpdate, now: Instant): F[Int]
-}
 
-object StationRepository {
-  implicit val functorK: FunctorK[StationRepository] = Derive.functorK
-}
 
 object DoobieStationRepository extends StationRepository[ConnectionIO] {
   def insert(station: Station, on: Instant): ConnectionIO[UUID] = {

@@ -1,4 +1,4 @@
-package co.mycelium.db
+package co.mycelium.adapters.db
 
 import cats.*
 import cats.data.*

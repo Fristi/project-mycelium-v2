@@ -2,7 +2,7 @@ package co.mycelium.adapters
 
 import cats.effect.{IO, Resource}
 import cats.implicits.*
-import co.mycelium.adapters.OpenAiPlantClassifier
+import co.mycelium.adapters.classifier.OpenAiPlantClassifier
 import co.mycelium.ports.PlantClassifier
 import sttp.client4.httpclient.cats.HttpClientCatsBackend
 import weaver.*

@@ -1,4 +1,4 @@
-package co.mycelium.adapters
+package co.mycelium.adapters.profiler
 
 import cats.effect.Sync
 import cats.implicits.*

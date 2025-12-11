@@ -1,23 +1,14 @@
-package co.mycelium.db
+package co.mycelium.adapters.db
 
 import cats.tagless.{Derive, FunctorK}
 import co.mycelium.domain.*
+import co.mycelium.ports.StationMeasurementRepository
 import doobie.*
 import doobie.implicits.*
 import doobie.postgres.implicits.*
 
 import java.util.UUID
 import scala.annotation.experimental
-
-trait StationMeasurementRepository[F[_]] {
-  def insertMany(stationId: UUID, measurements: List[StationMeasurement]): F[Int]
-
-  def avg(stationId: UUID, period: MeasurementPeriod): F[List[StationMeasurement]]
-}
-
-object StationMeasurementRepository {
-  implicit val functorK: FunctorK[StationMeasurementRepository] = Derive.functorK
-}
 
 object DoobieStationMeasurementRepository extends StationMeasurementRepository[ConnectionIO] {
   override def insertMany(

@@ -1,6 +1,7 @@
 package co.mycelium.adapters
 
 import cats.effect.{IO, Resource}
+import co.mycelium.adapters.profiler.OpenPlantBookPlantProfiler
 import co.mycelium.domain.{Interval, PlantProfile, PlantProfileVariables}
 import co.mycelium.ports.PlantProfiler
 import sttp.client4.httpclient.cats.HttpClientCatsBackend

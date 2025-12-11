@@ -3,7 +3,7 @@ package co.mycelium.ports
 import cats.Applicative
 import cats.effect.{Async, Resource}
 import co.mycelium.{ImplementationType, PlantProfilerConfig}
-import co.mycelium.adapters.{ConstantPlantProfiler, OpenPlantBookPlantProfiler}
+import co.mycelium.adapters.profiler.{ConstantPlantProfiler, OpenPlantBookPlantProfiler}
 import co.mycelium.domain.PlantProfile
 import sttp.client4.httpclient.cats.HttpClientCatsBackend
 

@@ -6,7 +6,6 @@ import cats.Monad
 import cats.effect.std.UUIDGen
 import cats.effect.{Clock, Concurrent}
 import cats.implicits.*
-import co.mycelium.db.Repositories
 import co.mycelium.domain.*
 import co.mycelium.ports.*
 import fs2.Stream

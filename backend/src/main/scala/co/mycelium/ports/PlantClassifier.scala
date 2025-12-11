@@ -2,7 +2,7 @@ package co.mycelium.ports
 
 import cats.Applicative
 import cats.effect.{Async, IO, Resource}
-import co.mycelium.adapters.{ConstantPlantClassifier, OpenAiPlantClassifier}
+import co.mycelium.adapters.classifier.{ConstantPlantClassifier, OpenAiPlantClassifier}
 import co.mycelium.{ImplementationType, PlantClassifierConfig}
 import fs2.Stream
 import sttp.client4.httpclient.cats.HttpClientCatsBackend
