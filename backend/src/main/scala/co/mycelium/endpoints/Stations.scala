@@ -23,47 +23,89 @@ import scala.concurrent.duration.FiniteDuration
 @experimental
 object Stations extends TapirSchemas {
 
-  object endpoints {
-    val stations = base.in("stations")
+  val secured = endpoint
+    .securityIn(auth.bearer[String]())
+    .serverSecurityLogic(Auth.validate)
 
-    val list    = stations.get.out(jsonBody[List[Station]]).name("listStations")
-    val add     = stations.post.in(jsonBody[StationInsert]).out(jsonBody[UUID]).name("addStation")
-    val details = stations.get
+  object endpoints {
+    val stationsNonSecured = endpoint.in("stations")
+    val stationsSecured    = secured.in("stations")
+    val profileSecured     = secured.in("profiles")
+
+    val list = stationsSecured.get.out(jsonBody[List[Station]]).name("listStations")
+    val add  =
+      stationsSecured.post.in(jsonBody[StationInsert]).out(jsonBody[UUID]).name("addStation")
+    val details = stationsSecured.get
       .in(path[UUID]("stationId"))
       .in(query[Option[MeasurementPeriod]]("period"))
       .name("getStation")
       .out(jsonBody[StationDetails])
     val update =
-      stations.put.in(path[UUID]("stationId")).in(jsonBody[StationUpdate]).name("updateStation")
-    val delete  = stations.delete.in(path[UUID]("stationId")).name("deleteStation")
-    val checkIn = stations
+      stationsSecured.put
+        .in(path[UUID]("stationId"))
+        .in(jsonBody[StationUpdate])
+        .name("updateStation")
+    val delete  = stationsSecured.delete.in(path[UUID]("stationId")).name("deleteStation")
+    val checkIn = stationsSecured
       .in(path[UUID]("stationId"))
       .in("checkin")
       .put
       .in(jsonBody[List[StationMeasurement]])
       .name("checkinStation")
       .out(jsonBody[Watering])
-    val watered = stations
+    val watered = stationsSecured
       .in(path[UUID]("stationId"))
       .in("watered")
       .post
       .in(jsonBody[Watering])
       .name("wateredAtStation")
-    val log = stations
+    val log = stationsSecured
       .in(path[UUID]("stationId"))
       .in("log")
       .in(query[Option[Long]]("page"))
       .name("getStationLog")
       .out(jsonBody[List[StationLog]])
 
-    val upload = stations.post
+    val uploadAvatar = stationsSecured.post
       .in(path[UUID]("stationId"))
       .in("upload")
       .in(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByte, CodecFormat.OctetStream()))
-      .name("uploadImage")
+      .name("uploadAvatar")
       .out(jsonBody[List[PlantProfile]])
 
-    val all = Set(list, add, details, update, delete, checkIn, watered, log, upload)
+    val viewAvatar = stationsNonSecured.get
+      .in(path[UUID]("stationId"))
+      .in("avatar")
+      .name("viewAvatar")
+      .out(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByte, CodecFormat.OctetStream()))
+
+    val setProfile = profileSecured.post
+      .in("profile")
+      .in(path[UUID]("stationId"))
+      .in(jsonBody[PlantProfile])
+      .name("setProfile")
+      .out(emptyOutput)
+
+    val getProfiles = profileSecured.get
+      .name("getProfiles")
+      .out(jsonBody[List[StationPlantProfile]])
+
+    val nonSecuredEndpoints = Set(viewAvatar)
+
+    val securedEndpoints =
+      Set(
+        list,
+        add,
+        details,
+        update,
+        delete,
+        checkIn,
+        watered,
+        log,
+        uploadAvatar,
+        setProfile,
+        getProfiles
+      )
   }
 
   def toMyceliumError(error: String): ValuedEndpointOutput[?] =
@@ -108,13 +150,39 @@ object Stations extends TapirSchemas {
     val log =
       endpoints.log.serverLogic(at => (id, page) => svc.getLogs(at.sub, id, page).map(Right(_)))
 
-    val upload =
-      endpoints.upload.serverLogic(at =>
-        (id, stream) => svc.uploadFullPlantImage(at.sub, id, stream).map(Right(_))
+    val uploadAvatar =
+      endpoints.uploadAvatar.serverLogic(at =>
+        (id, stream) => svc.uploadAvatar(at.sub, id, stream).map(Right(_))
       )
 
+    val viewAvatar =
+      endpoints.viewAvatar.serverLogic(id => svc.viewAvatar(id).map(Right(_)))
+
+    val setProfile =
+      endpoints.setProfile.serverLogic(at =>
+        (id, profile) => svc.setProfile(at.sub, id, profile).map(Right(_))
+      )
+
+    val getProfiles =
+      endpoints.getProfiles.serverLogic(at => _ => svc.getProfiles(at.sub).map(Right(_)))
+
     Http4sServerInterpreter(serverOptions)
-      .toRoutes(List(list, add, delete, log, watered, checkin, details, update, upload))
+      .toRoutes(
+        List(
+          list,
+          add,
+          delete,
+          log,
+          watered,
+          checkin,
+          details,
+          update,
+          uploadAvatar,
+          viewAvatar,
+          setProfile,
+          getProfiles
+        )
+      )
   }
 }
 
@@ -124,6 +192,8 @@ trait TapirSchemas {
 
   implicit val schemaCronExpr: Schema[CronExpr]             = Schema.string
   implicit val schemaFiniteDuration: Schema[FiniteDuration] = Schema.string
+
+  implicit def schemaForInterval[A: Schema]: Schema[Interval[A]] = Schema.derived[Interval[A]]
 
   implicit val codecMeasurementPeriod: Codec[String, MeasurementPeriod, CodecFormat.TextPlain] =
     Codec.string.map(

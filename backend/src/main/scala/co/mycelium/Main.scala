@@ -7,7 +7,7 @@ import cats.effect.std.UUIDGen
 import cats.implicits.*
 import co.mycelium.{AppConfig, Transactors}
 import co.mycelium.db.Repositories
-import co.mycelium.endpoints.{Avatar, Stations}
+import co.mycelium.endpoints.Stations
 import co.mycelium.service.{StationService, StationServiceImpl}
 import co.mycelium.ports.*
 import com.comcast.ip4s.*
@@ -38,16 +38,8 @@ object Main extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
     app.use(_ => IO.never).as(ExitCode.Success)
 
-  def httpApp(svc: StationService[IO]): HttpApp[IO] = {
-    val server = Router(
-      "api"    -> Stations.routes(svc),
-      "avatar" -> Avatar.routes
-    )
-    val files  = fileService[IO](FileService.Config("."))
-    val routes = (server <+> files).orNotFound
-
-    routes
-  }
+  def httpApp(svc: StationService[IO]): HttpApp[IO] =
+    Router("api" -> Stations.routes(svc)).orNotFound
 
   private def errorHandling(log: Logger[IO])(route: Kleisli[IO, Request[IO], Response[IO]]) =
     ErrorHandling.Recover.total(
@@ -71,7 +63,8 @@ object Main extends IOApp {
     repos = Repositories.fromTransactor(tx),
     s3 = s3,
     plantClassifier = plantClassifier,
-    plantProfiler = plantProfiler
+    plantProfiler = plantProfiler,
+    plantAvatarPlaceHolder = new ResourcePlantAvatarPlaceHolder[IO]
   )
 
   val app: Resource[IO, Server] =

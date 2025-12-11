@@ -10,7 +10,8 @@ import io.circe.syntax._
 import java.nio.file.{Files, OpenOption, Path}
 
 object OpenApiGenerator extends App {
-  val endpoints     = Stations.endpoints.all.map(_.endpoint)
+  val endpoints =
+    Stations.endpoints.securedEndpoints.map(_.endpoint) ++ Stations.endpoints.nonSecuredEndpoints
   val docs: OpenAPI = OpenAPIDocsInterpreter()
     .toOpenAPI(endpoints, "Mycelium API", "1.0.0")
 //    .addServer(Server("https://mycelium.app.dev", Some("Production server")))

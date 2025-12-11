@@ -12,6 +12,10 @@ object Interval {
     Decoder.derived
 }
 
+case class StationPlantProfile(stationId: String, mac: String, profile: PlantProfile)
+    derives Encoder.AsObject,
+      Decoder
+
 case class PlantProfile(
     name: String,
     variables: PlantProfileVariables
