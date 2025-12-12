@@ -44,6 +44,12 @@ pub struct Socket {
     fd: AsyncFd<OwnedFd>,
 }
 
+impl Drop for Socket {
+    fn drop(&mut self) {
+        let _ = unsafe { libc::close(self.fd.as_raw_fd()) };
+    }
+}
+
 // We use `libc` directly because
 // * `nix` makes it awkward to bind an arbitrary address
 // * `rustix` makes it awkward to set arbitrary sockopts
