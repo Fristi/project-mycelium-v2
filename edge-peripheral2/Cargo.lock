@@ -303,6 +303,7 @@ dependencies = [
  "shtcx",
  "timeseries",
  "trouble-host",
+ "xtensa-lx",
 ]
 
 [[package]]
