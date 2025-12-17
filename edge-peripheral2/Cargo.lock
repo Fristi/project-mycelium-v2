@@ -279,7 +279,6 @@ dependencies = [
  "nb 1.1.0",
  "shtcx",
  "trouble-host",
- "xtensa-lx",
 ]
 
 [[package]]

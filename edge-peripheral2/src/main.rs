@@ -22,11 +22,7 @@ async fn main(_s: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    esp_rtos::start(
-        timg0.timer0,
-        #[cfg(target_arch = "riscv32")]
-        software_interrupt.software_interrupt0,
-    );
+    esp_rtos::start(timg0.timer0);
 
     let radio = esp_radio::init().unwrap();
     let bluetooth = peripherals.BT;
