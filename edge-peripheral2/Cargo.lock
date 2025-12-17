@@ -27,6 +27,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
+name = "bh1730fvc"
+version = "0.2.0"
+source = "git+https://github.com/Fristi/bh1730fvc-rs?rev=dff319f4aae9da82dcea45c1f2b2ecd347da31c9#dff319f4aae9da82dcea45c1f2b2ecd347da31c9"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "log",
+]
+
+[[package]]
 name = "bitfield"
 version = "0.19.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -251,8 +261,13 @@ dependencies = [
 name = "edge-peripheral2"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bh1730fvc",
  "embassy-embedded-hal",
  "embassy-executor",
+ "embassy-time",
+ "embedded-hal 1.0.0",
+ "embedded-hal-bus",
  "esp-alloc",
  "esp-backtrace",
  "esp-bootloader-esp-idf",
@@ -261,6 +276,8 @@ dependencies = [
  "esp-radio",
  "esp-rtos",
  "esp-storage",
+ "nb 1.1.0",
+ "shtcx",
  "trouble-host",
  "xtensa-lx",
 ]
@@ -421,6 +438,16 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c4c685bbef7fe13c3c6dd4da26841ed3980ef33e841cddfa15ce8a8fb3f1884"
 dependencies = [
+ "embedded-hal 1.0.0",
+]
+
+[[package]]
+name = "embedded-hal-bus"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "513e0b3a8fb7d3013a8ae17a834283f170deaf7d0eeab0a7c1a36ad4dd356d22"
+dependencies = [
+ "critical-section",
  "embedded-hal 1.0.0",
 ]
 
@@ -1410,6 +1437,15 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "shtcx"
+version = "1.0.0"
+source = "git+https://github.com/Fristi/shtcx-rs?rev=d733731ff1e439459a8357310c85439ef9f64898#d733731ff1e439459a8357310c85439ef9f64898"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
 ]
 
 [[package]]

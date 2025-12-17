@@ -5,7 +5,16 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+nb = "1.1.0"
+embedded-hal = "1.0.0"
+embedded-hal-bus = { version = "0.3.0", features = [] }
+anyhow = { version = "1.0", default-features = false }
+shtcx = { git = "https://github.com/Fristi/shtcx-rs", rev = "d733731ff1e439459a8357310c85439ef9f64898" }
+bh1730fvc = { git = "https://github.com/Fristi/bh1730fvc-rs", rev = "dff319f4aae9da82dcea45c1f2b2ecd347da31c9" }
+
 embassy-executor = "0.9.1"
+embassy-time = "0.5.0"
+
 esp-bootloader-esp-idf = { version = "0.4.0", features = ["esp32"] }
 esp-backtrace = { version = "0.18.1", features = [ "panic-handler", "println", "esp32"] }
 esp-hal = { version = "1.0.0", features = [ "unstable", "esp32" ] }

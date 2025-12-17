@@ -1,6 +1,11 @@
 #![no_std]
 #![no_main]
 
+mod anyhow_utils;
+mod battery;
+mod moisture;
+mod gauge;
+
 use embassy_executor::Spawner;
 use esp_hal::clock::CpuClock;
 use esp_hal::timer::timg::TimerGroup;
