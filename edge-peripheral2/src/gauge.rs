@@ -4,6 +4,7 @@ use bh1730fvc::{blocking::BH1730FVC};
 use embassy_time::{Delay, Timer};
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_hal::{analog::adc::AdcChannel, gpio::Output, i2c::master::I2c, Blocking};
+use edge_protocol::Measurement;
 
 use crate::battery::BatteryMeasurement;
 use crate::anyhow_utils::*;
@@ -30,7 +31,7 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
         }
     }
 
-    pub async fn sample(&mut self) -> anyhow::Result<()> {
+    pub async fn sample(&mut self) -> anyhow::Result<Measurement> {
         self.pcb_pwr.set_high();
 
         Timer::after_millis(100).await;
@@ -69,15 +70,15 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
 
         self.pcb_pwr.set_low();
 
-        // let measurement = Measurement {
-        //     battery,
-        //     lux,
-        //     temperature: measurement.temperature.as_degrees_celsius(),
-        //     humidity: measurement.humidity.as_percent(),
-        //     soil_pf
-        // };
+        let measurement = Measurement {
+            battery,
+            lux,
+            temperature: measurement.temperature.as_degrees_celsius(),
+            humidity: measurement.humidity.as_percent(),
+            soil_pf
+        };
 
-        Ok(())
+        Ok(measurement)
     }
 }
 
