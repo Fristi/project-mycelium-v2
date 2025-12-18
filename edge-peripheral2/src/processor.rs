@@ -156,7 +156,7 @@ pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow
                 let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
 
                 let i2c_pcb = esp_hal::i2c::master::I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
-                    .expect("I2c pcb init failed")
+                    .with_anyhow("Failed to init i2c pcb")?
                     .with_sda(peripherals.GPIO21)
                     .with_scl(peripherals.GPIO22);
                     
@@ -167,7 +167,7 @@ pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow
                     .with_pull(esp_hal::gpio::Pull::Up);
 
                 let i2c_ext = esp_hal::i2c::master::I2c::new(peripherals.I2C1, esp_hal::i2c::master::Config::default())
-                    .expect("I2c ext init failed")
+                    .with_anyhow("Failed to init i2c ext")?
                     .with_sda(peripherals.GPIO27)
                     .with_scl(peripherals.GPIO26);
 
@@ -191,7 +191,7 @@ pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow
                 let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
 
                 let i2c_pcb = esp_hal::i2c::master::I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
-                    .expect("I2c pcb init failed")
+                    .with_anyhow("Failed to init i2c pcb")?
                     .with_sda(peripherals.GPIO21)
                     .with_scl(peripherals.GPIO22);
                     
@@ -202,7 +202,7 @@ pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow
                     .with_pull(esp_hal::gpio::Pull::Up);
 
                 let i2c_ext = esp_hal::i2c::master::I2c::new(peripherals.I2C1, esp_hal::i2c::master::Config::default())
-                    .expect("I2c ext init failed")
+                    .with_anyhow("Failed to init i2c ext")?
                     .with_sda(peripherals.GPIO27)
                     .with_scl(peripherals.GPIO26);
 
