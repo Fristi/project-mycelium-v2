@@ -2,11 +2,11 @@
 #![no_main]
 
 mod processor;
-mod anyhow_utils;
 mod battery;
 mod moisture;
 mod gauge;
 mod state;
+mod utils;
 
 use chrono::NaiveDateTime;
 use edge_protocol::Measurement;
@@ -16,6 +16,7 @@ use crate::{processor::process, processor::Processor, state::get_device_state, s
 use {esp_alloc as _, esp_backtrace as _};
 use esp_hal::{peripherals::GPIO34, rtc_cntl::sleep::{RtcSleepConfig, TimerWakeupSource}};
 use log::{info, trace, error};
+use crate::utils::rtc::RtcExt;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -44,13 +45,7 @@ impl Processor for DebugProcessor {
         let sample = gauge.sample().await?;
         let mut measurements = state.clone();
 
-        let now_us = rtc.current_time_us() as i64;
-        let secs = now_us / 1_000_000;
-        let nsecs = (now_us % 1_000_000) * 1_000;
-
-        let naive = NaiveDateTime::from_timestamp(secs, nsecs as u32);
-
-        measurements.append_monotonic(naive, sample);
+        measurements.append_monotonic(rtc.now_naivedatetime(), sample);
 
         let next_state = if(measurements.is_full()) {
             state::DeviceState::Flush(measurements)

@@ -7,7 +7,7 @@ use esp_hal::{analog::adc::AdcChannel, gpio::Output, i2c::master::I2c, Blocking}
 use edge_protocol::Measurement;
 
 use crate::battery::BatteryMeasurement;
-use crate::anyhow_utils::*;
+use crate::utils::anyhow::ResultAny;
 use crate::moisture::SoilSensor;
 
 pub struct Gauge<'a, P : AdcChannel> {
