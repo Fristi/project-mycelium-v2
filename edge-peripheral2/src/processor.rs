@@ -11,11 +11,15 @@ use esp_hal::rtc_cntl::Rtc;
 use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_radio::{Controller, ble::controller::BleConnector};
 
+use log::info;
 use trouble_host::prelude::ExternalController;
 
 use crate::battery::BatteryMeasurement;
 use crate::gauge::Gauge;
 use crate::state::{DeviceState, Measurements};
+use crate::utils::rtc::RtcExt;
+use crate::utils::anyhow::ResultAny;
+use crate::state;
 
 pub struct ProcessorResult {
     pub next_state: DeviceState,
@@ -45,6 +49,70 @@ pub trait Processor {
     )  -> anyhow::Result<DeviceState>;
 }
 
+
+pub struct DebugProcessor;
+
+impl DebugProcessor {
+    pub fn new() -> Self  {
+        Self {}
+    }
+}
+
+impl Processor for DebugProcessor {
+    async fn awaiting_time_sync(&self, 
+        rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
+        mac: [u8; 6], 
+        controller: trouble_host::prelude::ExternalController<esp_radio::ble::controller::BleConnector<'_>, 20>) -> anyhow::Result<state::DeviceState> {
+        
+        info!("Awaiting time sync ... ");
+
+        Ok(state::DeviceState::Buffering(timeseries::Series::new(edge_protocol::Measurement::MAX_DEVIATION)))
+    }
+    
+    async fn buffering(&self,
+        state: &crate::state::Measurements,
+        rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
+        gauge: &mut crate::gauge::Gauge<'_, GPIO34<'_>>,
+        rng: esp_hal::rng::Rng
+    )  -> anyhow::Result<state::DeviceState> {
+
+        info!("Measuring ... {}/6 ", &state.buckets.len());
+
+        let sample = gauge.sample().await?;
+        let mut measurements = state.clone();
+
+        measurements.append_monotonic(rtc.now_naivedatetime(), sample);
+
+        let next_state = if(measurements.is_full()) {
+            state::DeviceState::Flush(measurements)
+        } else {
+            state::DeviceState::Buffering(measurements)
+        };
+
+        Ok(next_state)
+    }
+    
+    async fn flushing(&self,
+        state: &crate::state::Measurements,
+        rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
+        gauge: &mut crate::gauge::Gauge<'_, GPIO34<'_>>,
+        mac: [u8; 6], 
+        controller: trouble_host::prelude::ExternalController<esp_radio::ble::controller::BleConnector<'_>, 20>,
+        rng: esp_hal::rng::Rng
+    )  -> anyhow::Result<state::DeviceState> {
+
+        for m in &state.buckets {
+            info!("At {:?} got .. {} % RH, {} lux, {} pF, {} C, {} battery", m.range, m.value.humidity, m.value.lux, m.value.soil_pf, m.value.temperature, m.value.battery);
+        }
+
+        embassy_time::Timer::after_millis(150).await;
+        
+        Ok(state::DeviceState::Buffering(timeseries::Series::new(edge_protocol::Measurement::MAX_DEVIATION)))
+    }
+
+    
+}
+
 pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow::Result<ProcessorResult> {
 
         let cpu_clock = match state {
@@ -67,9 +135,9 @@ pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow
         match state {
             DeviceState::AwaitingTimeSync => {
         
-                let radio = esp_radio::init().unwrap();
+                let radio = esp_radio::init().with_anyhow("Failed to init radio")?;
                 let bluetooth = peripherals.BT;
-                let connector = BleConnector::new(&radio, bluetooth, Default::default()).unwrap();
+                let connector = BleConnector::new(&radio, bluetooth, Default::default()).with_anyhow("Failed to init BLE")?;
                 let controller = ExternalController::new(connector);
 
                 let next_state = processor.awaiting_time_sync(&rtc, mac, controller).await?;
@@ -143,9 +211,9 @@ pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow
                 let battery = BatteryMeasurement::new(adc, pin);
                 let mut gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
 
-                let radio = esp_radio::init().unwrap();
+                let radio = esp_radio::init().with_anyhow("Failed to init radio")?;
                 let bluetooth = peripherals.BT;
-                let connector = BleConnector::new(&radio, bluetooth, Default::default()).unwrap();
+                let connector = BleConnector::new(&radio, bluetooth, Default::default()).with_anyhow("Failed to init BLE")?;
                 let controller = ExternalController::new(connector);
 
                 let next_state = processor.flushing(&measurements, &rtc, &mut gauge, mac, controller, rng).await?;
