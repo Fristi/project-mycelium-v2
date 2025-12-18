@@ -7,6 +7,7 @@ mod moisture;
 mod gauge;
 mod state;
 mod utils;
+mod ble;
 
 use embassy_executor::Spawner;
 use crate::{processor::{process, DebugProcessor}, state::get_device_state, state::set_device_state};

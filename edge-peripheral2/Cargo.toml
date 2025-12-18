@@ -14,6 +14,7 @@ bh1730fvc = { git = "https://github.com/Fristi/bh1730fvc-rs", rev = "dff319f4aae
 timeseries = { git = "https://github.com/Fristi/timeseries", rev = "869521bb62a99a101e8f0f7d60fadac2a2a046ba" }
 edge-protocol = { path = "../edge-protocol" }
 log = "0.4.29"
+static_cell = { version = "2.1.1" }
 
 embedded-hal = "1.0.0"
 embedded-hal-bus = { version = "0.3.0", features = [] }
@@ -21,6 +22,7 @@ embedded-hal-bus = { version = "0.3.0", features = [] }
 embassy-executor = "0.9.1"
 embassy-time = "0.5.0"
 embassy-embedded-hal = "0.5.0"
+embassy-sync = { version = "0.7.2" }
 trouble-host = { version = "0.5.1", features = ["default-packet-pool-mtu-255"] }
 
 esp-bootloader-esp-idf = { version = "0.4.0", features = ["esp32"] }

@@ -1,5 +1,7 @@
-#![deny(unsafe_code)]
 #![cfg_attr(not(test), no_std)]
+
+pub mod proto;
+pub mod v2;
 
 use bitflags::bitflags;
 use chrono::prelude::*;
