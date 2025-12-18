@@ -8,35 +8,29 @@ license = "MIT OR Apache-2.0"
 anyhow = { version = "1.0", default-features = false }
 chrono = { version = "0.4.41", default-features = false }
 nb = "1.1.0"
-embedded-hal = "1.0.0"
-embedded-hal-bus = { version = "0.3.0", features = [] }
+xtensa-lx = "0.13.0"
 shtcx = { git = "https://github.com/Fristi/shtcx-rs", rev = "d733731ff1e439459a8357310c85439ef9f64898" }
 bh1730fvc = { git = "https://github.com/Fristi/bh1730fvc-rs", rev = "dff319f4aae9da82dcea45c1f2b2ecd347da31c9" }
 timeseries = { git = "https://github.com/Fristi/timeseries", rev = "869521bb62a99a101e8f0f7d60fadac2a2a046ba" }
 edge-protocol = { path = "../edge-protocol" }
+log = "0.4.29"
 
+embedded-hal = "1.0.0"
+embedded-hal-bus = { version = "0.3.0", features = [] }
 
 embassy-executor = "0.9.1"
 embassy-time = "0.5.0"
+embassy-embedded-hal = "0.5.0"
+trouble-host = { version = "0.5.1", features = ["default-packet-pool-mtu-255"] }
 
 esp-bootloader-esp-idf = { version = "0.4.0", features = ["esp32"] }
 esp-backtrace = { version = "0.18.1", features = [ "panic-handler", "println", "esp32"] }
-esp-hal = { version = "1.0.0", features = [ "unstable", "esp32" ] }
+esp-hal = { version = "1.0.0", features = [ "unstable", "esp32", "log-04" ] }
 esp-alloc = { version = "0.9.0" }
 esp-println = { version = "0.16.0", features = ["log-04", "esp32"] }
 esp-radio = { version = "0.17.0", features = ["ble", "log-04", "unstable", "esp32"] }
 esp-rtos = { version = "0.2.0", features = ["embassy", "esp-alloc", "esp-radio", "log-04", "esp32"] }
-trouble-host = { version = "0.5.1", features = ["default-packet-pool-mtu-255"] }
-
-# for 'ble_bas_peripheral_bonding'
-embassy-embedded-hal = "0.5.0"
 esp-storage = { version = "0.8.1", features = ["esp32"] }
-xtensa-lx = "0.13.0"
-
-[profile.dev]
-opt-level = "s"
-overflow-checks = false
-# lto = 'thin'
 
 [profile.release]
 codegen-units = 1 # LLVM can perform better optimizations using a single thread

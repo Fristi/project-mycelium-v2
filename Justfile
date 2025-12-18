@@ -23,3 +23,6 @@ central-build-roll:
 
 edge-peripheral-build:
     . ~/export-esp.sh && cd edge-peripheral2 && cargo build --target xtensa-esp32-none-elf --release
+
+edge-peripheral-flash:
+    . ~/export-esp.sh && cd edge-peripheral2 && cargo run --target xtensa-esp32-none-elf --release

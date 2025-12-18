@@ -299,6 +299,7 @@ dependencies = [
  "esp-radio",
  "esp-rtos",
  "esp-storage",
+ "log",
  "nb 1.1.0",
  "shtcx",
  "timeseries",

@@ -50,10 +50,10 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
 
         let soil_pf = soil.read().await.with_anyhow("Unable to read soil")?;
 
-        let mut sht = shtcx::blocking::shtc3(RefCellDevice::new(&self.i2c_pcb));
-        
         let mut bh1730fvc = BH1730FVC::new(&mut delay, &mut i2c_pcb_bh1730fvc)
             .with_anyhow("BH1730FVC init failed")?;
+
+        let mut sht = shtcx::blocking::shtc3(RefCellDevice::new(&self.i2c_pcb));
         
         sht.start_measurement(shtcx::blocking::PowerMode::NormalMode)
             .with_anyhow("SHT start measurement failed")?;
@@ -64,6 +64,7 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
         Timer::after_millis(150).await;
 
         let lux = bh1730fvc.read_ambient_light_intensity(&mut i2c_pcb_sht).with_anyhow("BH1730FVC read failed")?;
+
         let battery = self.bm.sample();
         
         let measurement = sht.get_measurement_result().with_anyhow("SHT read failed")?;

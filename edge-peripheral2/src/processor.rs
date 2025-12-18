@@ -15,7 +15,7 @@ use trouble_host::prelude::ExternalController;
 
 use crate::battery::BatteryMeasurement;
 use crate::gauge::Gauge;
-use crate::state::DeviceState;
+use crate::state::{DeviceState, Measurements};
 
 pub struct ProcessorResult {
     pub next_state: DeviceState,
@@ -24,15 +24,23 @@ pub struct ProcessorResult {
 
 pub trait Processor {
     async fn awaiting_time_sync(&self, 
-        state: &DeviceState, 
         rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
         mac: [u8; 6], 
         controller: trouble_host::prelude::ExternalController<BleConnector<'_>, 20>) -> anyhow::Result<DeviceState>;
 
     async fn buffering(&self,
-        state: &DeviceState, 
+        state: &crate::state::Measurements,
         rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
-        gauge: crate::gauge::Gauge<'_, GPIO34<'_>>,
+        gauge: &mut crate::gauge::Gauge<'_, GPIO34<'_>>,
+        rng: esp_hal::rng::Rng
+    )  -> anyhow::Result<DeviceState>;
+
+    async fn flushing(&self,
+        state: &crate::state::Measurements,
+        rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
+        gauge: &mut crate::gauge::Gauge<'_, GPIO34<'_>>,
+        mac: [u8; 6], 
+        controller: trouble_host::prelude::ExternalController<BleConnector<'_>, 20>,
         rng: esp_hal::rng::Rng
     )  -> anyhow::Result<DeviceState>;
 }
@@ -64,7 +72,7 @@ pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow
                 let connector = BleConnector::new(&radio, bluetooth, Default::default()).unwrap();
                 let controller = ExternalController::new(connector);
 
-                let next_state = processor.awaiting_time_sync(state, &rtc, mac, controller).await?;
+                let next_state = processor.awaiting_time_sync(&rtc, mac, controller).await?;
                 let processor_result = ProcessorResult { next_state, rtc };
 
                 Ok(processor_result)
@@ -76,100 +84,74 @@ pub async fn process<P : Processor>(state: &DeviceState, processor: P) -> anyhow
                 let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
                 let adc = Adc::new(peripherals.ADC1, adc_config);
                 let output_config_pcb = OutputConfig::default();
-            
-                let i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config_pcb);
-                let i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config_pcb);
+    
                 let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
-                
-                let i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
-                    peripherals.I2C0,
-                    esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100))//.with_timeout(BusTimeout::Maximum),
-                )
-                .expect("I2c init failed")
-                .with_sda(i2c_pcb_sda)
-                .with_scl(i2c_pcb_scl));
 
+                let i2c_pcb = esp_hal::i2c::master::I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
+                    .expect("I2c pcb init failed")
+                    .with_sda(peripherals.GPIO21)
+                    .with_scl(peripherals.GPIO22);
+                    
+                let i2c_pcb_refcell = RefCell::new(i2c_pcb);
                 
                 let output_config_ext = OutputConfig::default()
                     .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
                     .with_pull(esp_hal::gpio::Pull::Up);
 
-                let i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::Low, output_config_ext);
-                let i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::Low, output_config_ext);
+                let i2c_ext = esp_hal::i2c::master::I2c::new(peripherals.I2C1, esp_hal::i2c::master::Config::default())
+                    .expect("I2c ext init failed")
+                    .with_sda(peripherals.GPIO27)
+                    .with_scl(peripherals.GPIO26);
 
-                let i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
-                    peripherals.I2C1,
-                    esp_hal::i2c::master::Config::default()
-                )
-                .expect("I2c init failed")
-                .with_sda(i2c_ext_sda)
-                .with_scl(i2c_ext_scl));
+                let i2c_ext_refcell = RefCell::new(i2c_ext);
             
                 let battery = BatteryMeasurement::new(adc, pin);
-                let gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
+                let mut gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
 
-
-                let next_state = processor.buffering(state, &rtc, gauge, rng).await?;
+                let next_state = processor.buffering(&measurements, &rtc, &mut gauge, rng).await?;
                 let processor_result = ProcessorResult { next_state, rtc };
 
                 Ok(processor_result)
-            },
+            }
             DeviceState::Flush(measurements) => {
+                let adc_pin = peripherals.GPIO34;
+                let mut adc_config = AdcConfig::new();
+                let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
+                let adc = Adc::new(peripherals.ADC1, adc_config);
+                let output_config_pcb = OutputConfig::default();
+    
+                let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
 
-                // let esp_wifi_ctrl = &*mk_static!(
-                //     EspWifiController<'static>,
-                //     init(
-                //         timg0.timer0,
-                //         rng,
-                //         peripherals.RADIO_CLK,
-                //     )
-                //     .unwrap()
-                // );
-                // let bluetooth = peripherals.BT;
-                // let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth);
-
-                // let controller: ExternalController<_, 20> = ExternalController::new(connector);
-
-                // let adc_pin = peripherals.GPIO34;
-                // let mut adc_config = AdcConfig::new();
-                // let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
-                // let adc = Adc::new(peripherals.ADC1, adc_config);
-                // let output_config_pcb = OutputConfig::default();
-            
-                // let i2c_pcb_sda = Output::new(peripherals.GPIO21, esp_hal::gpio::Level::Low, output_config_pcb);
-                // let i2c_pcb_scl = Output::new(peripherals.GPIO22, esp_hal::gpio::Level::Low, output_config_pcb);
-                // let pcb_pwr = Output::new(peripherals.GPIO23, esp_hal::gpio::Level::High, output_config_pcb);
+                let i2c_pcb = esp_hal::i2c::master::I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
+                    .expect("I2c pcb init failed")
+                    .with_sda(peripherals.GPIO21)
+                    .with_scl(peripherals.GPIO22);
+                    
+                let i2c_pcb_refcell = RefCell::new(i2c_pcb);
                 
-                // let i2c_pcb_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
-                //     peripherals.I2C0,
-                //     esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(100)).with_timeout(BusTimeout::Maximum),
-                // )
-                // .expect("I2c init failed")
-                // .with_sda(i2c_pcb_sda)
-                // .with_scl(i2c_pcb_scl));
+                let output_config_ext = OutputConfig::default()
+                    .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
+                    .with_pull(esp_hal::gpio::Pull::Up);
 
-                
-                // let output_config_ext = OutputConfig::default()
-                //     .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
-                //     .with_pull(esp_hal::gpio::Pull::Up);
+                let i2c_ext = esp_hal::i2c::master::I2c::new(peripherals.I2C1, esp_hal::i2c::master::Config::default())
+                    .expect("I2c ext init failed")
+                    .with_sda(peripherals.GPIO27)
+                    .with_scl(peripherals.GPIO26);
 
-                // let i2c_ext_sda = Output::new(peripherals.GPIO27, esp_hal::gpio::Level::Low, output_config_ext);
-                // let i2c_ext_scl = Output::new(peripherals.GPIO26, esp_hal::gpio::Level::Low, output_config_ext);
-
-                // let i2c_ext_refcell = RefCell::new(esp_hal::i2c::master::I2c::new(
-                //     peripherals.I2C1,
-                //     esp_hal::i2c::master::Config::default()
-                // )
-                // .expect("I2c init failed")
-                // .with_sda(i2c_ext_sda)
-                // .with_scl(i2c_ext_scl));
+                let i2c_ext_refcell = RefCell::new(i2c_ext);
             
-                // let battery = BatteryMeasurement::new(adc, pin);
-                // let gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
+                let battery = BatteryMeasurement::new(adc, pin);
+                let mut gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
 
-                // Self::Flush { rtc, mac, gauge, measurements, ble: controller, rng }
+                let radio = esp_radio::init().unwrap();
+                let bluetooth = peripherals.BT;
+                let connector = BleConnector::new(&radio, bluetooth, Default::default()).unwrap();
+                let controller = ExternalController::new(connector);
 
-                todo!()
+                let next_state = processor.flushing(&measurements, &rtc, &mut gauge, mac, controller, rng).await?;
+                let processor_result = ProcessorResult { next_state, rtc };
+
+                Ok(processor_result)
             }
         }
     }

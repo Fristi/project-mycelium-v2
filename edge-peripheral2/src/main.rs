@@ -8,33 +8,75 @@ mod moisture;
 mod gauge;
 mod state;
 
+use chrono::NaiveDateTime;
+use edge_protocol::Measurement;
 use embassy_executor::Spawner;
-use crate::{processor::process, processor::Processor, state::get, state::set};
+use timeseries::Series;
+use crate::{processor::process, processor::Processor, state::get_device_state, state::set_device_state};
 use {esp_alloc as _, esp_backtrace as _};
 use esp_hal::{peripherals::GPIO34, rtc_cntl::sleep::{RtcSleepConfig, TimerWakeupSource}};
+use log::{info, trace, error};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-struct NoopProcessor;
+struct DebugProcessor;
 
-impl Processor for NoopProcessor {
+impl Processor for DebugProcessor {
     async fn awaiting_time_sync(&self, 
-        state: &state::DeviceState, 
         rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
         mac: [u8; 6], 
         controller: trouble_host::prelude::ExternalController<esp_radio::ble::controller::BleConnector<'_>, 20>) -> anyhow::Result<state::DeviceState> {
         
-        Ok(state::DeviceState::AwaitingTimeSync)
+        info!("Awaiting time sync ... ");
+
+        Ok(state::DeviceState::Buffering(Series::new(Measurement::MAX_DEVIATION)))
     }
     
     async fn buffering(&self,
-        state: &state::DeviceState, 
+        state: &crate::state::Measurements,
         rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
-        gauge: crate::gauge::Gauge<'_, GPIO34<'_>>,
+        gauge: &mut crate::gauge::Gauge<'_, GPIO34<'_>>,
         rng: esp_hal::rng::Rng
     )  -> anyhow::Result<state::DeviceState> {
 
-        Ok(state::DeviceState::AwaitingTimeSync)
+        info!("Measuring ... {}/6 ", &state.buckets.len());
+
+        let sample = gauge.sample().await?;
+        let mut measurements = state.clone();
+
+        let now_us = rtc.current_time_us() as i64;
+        let secs = now_us / 1_000_000;
+        let nsecs = (now_us % 1_000_000) * 1_000;
+
+        let naive = NaiveDateTime::from_timestamp(secs, nsecs as u32);
+
+        measurements.append_monotonic(naive, sample);
+
+        let next_state = if(measurements.is_full()) {
+            state::DeviceState::Flush(measurements)
+        } else {
+            state::DeviceState::Buffering(measurements)
+        };
+
+        Ok(next_state)
+    }
+    
+    async fn flushing(&self,
+        state: &crate::state::Measurements,
+        rtc: &esp_hal::rtc_cntl::Rtc<'_>, 
+        gauge: &mut crate::gauge::Gauge<'_, GPIO34<'_>>,
+        mac: [u8; 6], 
+        controller: trouble_host::prelude::ExternalController<esp_radio::ble::controller::BleConnector<'_>, 20>,
+        rng: esp_hal::rng::Rng
+    )  -> anyhow::Result<state::DeviceState> {
+
+        for m in &state.buckets {
+            info!("At {:?} got .. {} % RH, {} lux, {} pF, {} C, {} battery", m.range, m.value.humidity, m.value.lux, m.value.soil_pf, m.value.temperature, m.value.battery);
+        }
+
+        embassy_time::Timer::after_millis(150).await;
+        
+        Ok(state::DeviceState::Buffering(Series::new(Measurement::MAX_DEVIATION)))
     }
 
     
@@ -42,19 +84,19 @@ impl Processor for NoopProcessor {
 
 #[esp_rtos::main]
 async fn main(_s: Spawner) {
-    let state = get();
+    let state = get_device_state();
     let mut cfg = RtcSleepConfig::deep();
     cfg.set_rtc_fastmem_pd_en(false);
-    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(1 * 10));
+    let wakeup_source = TimerWakeupSource::new(core::time::Duration::from_secs(1));
 
-    match process(state, NoopProcessor {}).await {
+    match process(state, DebugProcessor {}).await {
         Ok(result) => {
-            set(result.next_state);
+            set_device_state(result.next_state);
             let mut rtc = result.rtc;
             rtc.sleep(&cfg, &[&wakeup_source]);
         },
         Err(err) => {
-            todo!()
+            error!("Process crashed! {}", err);
         }
     }
 }

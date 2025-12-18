@@ -1,8 +1,6 @@
-[alias]
-esp32 = "run --release --target=xtensa-esp32-none-elf"
-
-[target.'cfg(all(any(target_arch = "riscv32", target_arch = "xtensa"), target_os = "none"))']
-runner = "espflash flash --monitor"
+[target.xtensa-esp32-none-elf]
+# runner = "espflash flash --monitor --chip esp32 --flash-freq 40mhz --flash-mode dio --port /dev/tty.usbserial-54350025201 --log-format defmt"
+runner = "espflash flash --monitor --chip esp32 --flash-freq 40mhz --flash-size 4mb --flash-mode dio --port /dev/tty.usbserial-11103"
 
 [build]
 rustflags = [

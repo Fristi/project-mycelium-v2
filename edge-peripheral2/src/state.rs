@@ -4,10 +4,13 @@ use chrono::NaiveDateTime;
 
 use esp_hal::ram;
 
+pub type Measurements = Series<6, NaiveDateTime, Measurement>;
+
+#[derive(Debug)]
 pub enum DeviceState {
     AwaitingTimeSync,
-    Buffering(Series<6, NaiveDateTime, Measurement>),
-    Flush(Series<6, NaiveDateTime, Measurement>)
+    Buffering(Measurements),
+    Flush(Measurements)
 }
 
 
@@ -17,11 +20,11 @@ pub enum DeviceState {
 #[ram(unstable(rtc_fast))]
 static mut STATE: DeviceState = DeviceState::AwaitingTimeSync;
 
-pub fn get() -> &'static DeviceState {
+pub fn get_device_state() -> &'static DeviceState {
     return unsafe { &STATE };
 }
 
-pub fn set(state: DeviceState) {
+pub fn set_device_state(state: DeviceState) {
     unsafe {
         STATE = state;
     }
