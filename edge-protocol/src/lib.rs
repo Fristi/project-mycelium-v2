@@ -1,5 +1,7 @@
-#![deny(unsafe_code)]
 #![cfg_attr(not(test), no_std)]
+
+pub mod proto;
+pub mod v2;
 
 use bitflags::bitflags;
 use chrono::prelude::*;
@@ -109,7 +111,7 @@ impl MeasurementSerieEntry {
 
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Measurement {
     pub battery: u8,
     pub lux: f32,
@@ -131,7 +133,7 @@ impl Measurement {
     pub const MAX_DEVIATION: Self = Self {
         battery: 1,
         lux: 100.0,
-        temperature: 1.0,
+        temperature: 0.1,
         humidity: 0.1,
         soil_pf: 0.1
     };

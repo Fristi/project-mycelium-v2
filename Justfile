@@ -19,3 +19,10 @@ central-build-roll:
     just central-build-dietpi
     sshpass -p {{sbc_pwd}} scp edge-central/target/aarch64-unknown-linux-musl/release/main {{sbc_user}}@{{sbc_host}}:~/central
     sshpass -p {{sbc_pwd}} ssh {{sbc_user}}@{{sbc_host}} '~/central'
+
+
+edge-peripheral-build:
+    . ~/export-esp.sh && cd edge-peripheral2 && cargo build --target xtensa-esp32-none-elf --release
+
+edge-peripheral-flash:
+    . ~/export-esp.sh && cd edge-peripheral2 && cargo run --target xtensa-esp32-none-elf --release
