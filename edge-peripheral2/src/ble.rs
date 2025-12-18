@@ -9,7 +9,6 @@ const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
 
 const L2CAP_MTU: usize = 512;
 
-
 #[gatt_service(uuid = STATION_SERVICE_UUID_16)]
 struct StationService {
     #[characteristic(uuid = STATION_MAC_ADDR_CHARACTERISTIC_UUID_16, read)]
@@ -29,3 +28,4 @@ struct StationService {
 struct Server {
     station_service: StationService
 }
+

@@ -33,7 +33,8 @@ macro_rules! as_gatt {
                     let ptr = buffer.as_ptr();
                     let mut writer = &mut buffer[..];
                     let mut encoder = micropb::PbEncoder::new(&mut writer);
-
+                    
+                    //TODO: trouBLE doesn't return an error type.. so we can only panic here
                     self.encode(&mut encoder).expect("Encoding failed...");
                     
                     unsafe { core::slice::from_raw_parts(ptr, <$t as AsGatt>::MAX_SIZE) }
@@ -52,6 +53,7 @@ macro_rules! from_gatt {
             {
                 fn from_gatt(data: &[u8]) -> Result<Self, FromGattError> {
                     let mut message = Self::default();
+                    //TODO: trouBLE doesn't have a specific case for decoding failures in FromGattError
                     message.decode_from_bytes(data).expect("Unable to decode");
                     Ok(message)
                 }
