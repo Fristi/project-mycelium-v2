@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use edge_protocol::*;
 use futures::Stream;
 use tokio::time::{sleep, Duration};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::measurements::types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider};
@@ -42,7 +43,7 @@ impl BtleplugPeripheralSyncResultStreamProvider {
 }
 
 impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamProvider {
-    fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>> {
+    fn stream(self: Box<Self>) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>>>> {
         let adapter = self.adapter.clone();
         let stream = futures::stream::unfold(adapter, |adapter| async {
             if let Err(err) = adapter
@@ -97,6 +98,8 @@ async fn sync(peripheral: Peripheral, now: DateTime<Utc>) -> anyhow::Result<Peri
                 return Err(anyhow!("Device does not have {} service", service));
             }
         };
+
+        info!("Found device {:?}", peripheral.address());
 
         let characteristic = match service
             .characteristics

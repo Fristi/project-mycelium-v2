@@ -19,7 +19,7 @@ impl RandomPeripheralSyncResultStreamProvider {
 }
 
 impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProvider {
-    fn stream(&self) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>> + Send>> {
+    fn stream(self: Box<Self>) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>>>> {
         let delay = Duration::from_millis(self.delay.num_milliseconds() as u64);
         let mac = self.mac;
         let stream = stream::unfold((delay, mac), |(delay, mac)| async move {

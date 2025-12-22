@@ -1,6 +1,7 @@
-pub mod auth;
+pub mod ble;
 pub mod cfg;
 pub mod data;
+pub mod auth;
 pub mod measurements;
 pub mod onboarding;
 pub mod status;
