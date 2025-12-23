@@ -65,6 +65,13 @@ object Stations extends TapirSchemas {
       .name("getStationLog")
       .out(jsonBody[List[StationLog]])
 
+    val stationProfile =
+      stationsSecured
+        .in(path[UUID]("stationId"))
+        .in("profile")
+        .name("getStationProfile")
+        .out(jsonBody[Option[PlantProfile]])
+
     val uploadAvatar = stationsSecured.post
       .in(path[UUID]("stationId"))
       .in("upload")
@@ -101,6 +108,7 @@ object Stations extends TapirSchemas {
         checkIn,
         watered,
         log,
+        stationProfile,
         uploadAvatar,
         setProfile,
         getProfiles
@@ -165,6 +173,12 @@ object Stations extends TapirSchemas {
     val getProfiles =
       endpoints.getProfiles.serverLogic(at => _ => svc.getProfiles(at.sub).map(Right(_)))
 
+    val getStationProfile =
+      endpoints.stationProfile.serverLogic(at =>
+        stationId =>
+          svc.getProfiles(at.sub).map(x => Right(x.find(_.stationId == stationId).map(_.profile)))
+      )
+
     Http4sServerInterpreter(serverOptions)
       .toRoutes(
         List(
@@ -172,6 +186,7 @@ object Stations extends TapirSchemas {
           add,
           delete,
           log,
+          getStationProfile,
           watered,
           checkin,
           details,

@@ -3,8 +3,9 @@ import AreaGraph from "../components/AreaGraph";
 import { createRetriever } from "../api";
 import Retrieve from "../Retrieve";
 import PlantLocation from "../components/PlantLocation";
+import { PlantProfileVariablesDisplay } from "../components/PlantProfileVariables";
 
-import { StationDetails, StationLog, StationMeasurement } from "../backend-client/api";
+import { PlantProfile, StationDetails, StationLog, StationMeasurement } from "../backend-client/api";
 
 type PlantLogProps = { plantId: string };
 
@@ -39,7 +40,23 @@ export const PlantView = () => {
     };
   };
 
+  const renderProfile = (data?: PlantProfile) => {
+    if(data) {
+      return (
+      <div>
+        <h1>{data.name}</h1>
+        <div className="w-full bg-white text-left p-4 border flex flex-col gap-2 mt-4">
+          <PlantProfileVariablesDisplay variables={data.variables} />
+        </div>
+        
+      </div>)
+    } else {
+      return <p>No profile selected</p>
+    }
+  };
+
   const getStationDetails = createRetriever(x => x.getStation(plantId ?? ""));
+  const getPlantProfile = createRetriever(x => x.getStationProfile(plantId ?? ""));
 
   const renderData = (stationDetails: StationDetails) => {
     const station = stationDetails.station;
@@ -79,7 +96,7 @@ export const PlantView = () => {
                   href={`/#/plants/${station.id}/avatar`}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
                 >
-                  Avatar
+                  Upload image
                 </a>
               </div>
             </div>
@@ -98,8 +115,7 @@ export const PlantView = () => {
                 <AreaGraph header="Battery voltage" label="V" data={measurements.batteryVoltage} />
               </div>
               <div className="lg:col-start-3">
-                <h2 className="text-sm font-semibold leading-6 text-gray-900 mb-5">Activity</h2>
-                <PlantLog plantId={plantId} />
+                <Retrieve dataKey={`plant/${plantId}/profile`} retriever={getPlantProfile} renderData={renderProfile} />
               </div>
             </div>
           </div>
@@ -108,5 +124,5 @@ export const PlantView = () => {
     );
   };
 
-  return <Retrieve dataKey={`plant/${plantId}/details`} retriever={getStationDetails} renderData={renderData} />;
+  return <Retrieve dataKey={`plant/${plantId}/details`} retriever={getStationDetails} renderData={renderData} />
 };

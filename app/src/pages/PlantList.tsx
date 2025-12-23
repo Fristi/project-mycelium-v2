@@ -5,6 +5,8 @@ import PlantCard from "../components/PlantCard";
 
 export const PlantList = () => {
   const renderData = (stations: Array<Station>) => {
+    if(!stations || !stations.length) return (<p>No stations here..</p>)
+
     return (
       <div className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
         {stations.map((s) => (
@@ -16,5 +18,5 @@ export const PlantList = () => {
 
   const retriever = createRetriever(x => x.listStations());
 
-  return <Retrieve dataKey="stations" retriever={retriever} renderData={renderData} />;
+  return <Retrieve dataKey="stations" retriever={retriever} renderData={renderData} />
 };
