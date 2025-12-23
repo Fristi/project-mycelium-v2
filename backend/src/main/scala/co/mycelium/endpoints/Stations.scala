@@ -65,10 +65,17 @@ object Stations extends TapirSchemas {
       .name("getStationLog")
       .out(jsonBody[List[StationLog]])
 
+    val stationProfile =
+      stationsSecured
+        .in(path[UUID]("stationId"))
+        .in("profile")
+        .name("getStationProfile")
+        .out(jsonBody[Option[PlantProfile]])
+
     val uploadAvatar = stationsSecured.post
       .in(path[UUID]("stationId"))
       .in("upload")
-      .in(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByte, CodecFormat.OctetStream()))
+      .in(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByteArray, CodecFormat.OctetStream()))
       .name("uploadAvatar")
       .out(jsonBody[List[PlantProfile]])
 
@@ -76,7 +83,7 @@ object Stations extends TapirSchemas {
       .in(path[UUID]("stationId"))
       .in("avatar")
       .name("viewAvatar")
-      .out(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByte, CodecFormat.OctetStream()))
+      .out(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByteArray, CodecFormat.OctetStream()))
 
     val setProfile = profileSecured.post
       .in("profile")
@@ -101,6 +108,7 @@ object Stations extends TapirSchemas {
         checkIn,
         watered,
         log,
+        stationProfile,
         uploadAvatar,
         setProfile,
         getProfiles
@@ -165,6 +173,12 @@ object Stations extends TapirSchemas {
     val getProfiles =
       endpoints.getProfiles.serverLogic(at => _ => svc.getProfiles(at.sub).map(Right(_)))
 
+    val getStationProfile =
+      endpoints.stationProfile.serverLogic(at =>
+        stationId =>
+          svc.getProfiles(at.sub).map(x => Right(x.find(_.stationId == stationId).map(_.profile)))
+      )
+
     Http4sServerInterpreter(serverOptions)
       .toRoutes(
         List(
@@ -172,6 +186,7 @@ object Stations extends TapirSchemas {
           add,
           delete,
           log,
+          getStationProfile,
           watered,
           checkin,
           details,
