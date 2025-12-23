@@ -723,11 +723,11 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
         /**
          * 
          * @param {string} stationId 
-         * @param {number} body 
+         * @param {File} body 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        uploadAvatar: async (stationId: string, body: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        uploadAvatar: async (stationId: string, body: File, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'stationId' is not null or undefined
             assertParamExists('uploadAvatar', 'stationId', stationId)
             // verify required parameter 'body' is not null or undefined
@@ -963,11 +963,11 @@ export const DefaultApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @param {string} stationId 
-         * @param {number} body 
+         * @param {File} body 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async uploadAvatar(stationId: string, body: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<PlantProfile>>> {
+        async uploadAvatar(stationId: string, body: File, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<PlantProfile>>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.uploadAvatar(stationId, body, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['DefaultApi.uploadAvatar']?.[localVarOperationServerIndex]?.url;
@@ -979,7 +979,7 @@ export const DefaultApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async viewAvatar(stationId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<number>> {
+        async viewAvatar(stationId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.viewAvatar(stationId, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['DefaultApi.viewAvatar']?.[localVarOperationServerIndex]?.url;
@@ -1095,11 +1095,11 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
         /**
          * 
          * @param {string} stationId 
-         * @param {number} body 
+         * @param {File} body 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        uploadAvatar(stationId: string, body: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<PlantProfile>> {
+        uploadAvatar(stationId: string, body: File, options?: RawAxiosRequestConfig): AxiosPromise<Array<PlantProfile>> {
             return localVarFp.uploadAvatar(stationId, body, options).then((request) => request(axios, basePath));
         },
         /**
@@ -1108,7 +1108,7 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        viewAvatar(stationId: string, options?: RawAxiosRequestConfig): AxiosPromise<number> {
+        viewAvatar(stationId: string, options?: RawAxiosRequestConfig): AxiosPromise<File> {
             return localVarFp.viewAvatar(stationId, options).then((request) => request(axios, basePath));
         },
         /**
@@ -1236,12 +1236,12 @@ export class DefaultApi extends BaseAPI {
     /**
      * 
      * @param {string} stationId 
-     * @param {number} body 
+     * @param {File} body 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public uploadAvatar(stationId: string, body: number, options?: RawAxiosRequestConfig) {
+    public uploadAvatar(stationId: string, body: File, options?: RawAxiosRequestConfig) {
         return DefaultApiFp(this.configuration).uploadAvatar(stationId, body, options).then((request) => request(this.axios, this.basePath));
     }
 

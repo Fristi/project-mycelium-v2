@@ -68,7 +68,7 @@ object Stations extends TapirSchemas {
     val uploadAvatar = stationsSecured.post
       .in(path[UUID]("stationId"))
       .in("upload")
-      .in(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByte, CodecFormat.OctetStream()))
+      .in(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByteArray, CodecFormat.OctetStream()))
       .name("uploadAvatar")
       .out(jsonBody[List[PlantProfile]])
 
@@ -76,7 +76,7 @@ object Stations extends TapirSchemas {
       .in(path[UUID]("stationId"))
       .in("avatar")
       .name("viewAvatar")
-      .out(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByte, CodecFormat.OctetStream()))
+      .out(streamBody(Fs2Streams.apply[IO])(Schema.schemaForByteArray, CodecFormat.OctetStream()))
 
     val setProfile = profileSecured.post
       .in("profile")
