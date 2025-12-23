@@ -64,7 +64,7 @@ export const PlantEdit = () => {
                     id="location"
                     name="location"
                     label="Location"
-                    placeholder="Living ..."
+                    placeholder="Location ..."
                     value={form.values.location}
                     onChange={form.handleChange}
                     helperText="Location is required"
