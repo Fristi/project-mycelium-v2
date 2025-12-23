@@ -1,10 +1,11 @@
 import { useQuery } from "react-query";
 import { useAuth } from "./AuthContext";
 import { ReactElement } from "react";
+import { AxiosResponse } from "axios";
 
 type Props<T> = {
   dataKey: string;
-  retriever: (token: string) => Promise<T>;
+  retriever: (token: string) => Promise<AxiosResponse<T, any>>;
   renderData: (data: T) => ReactElement;
 };
 
@@ -15,7 +16,7 @@ export default function <T>(props: Props<T>): ReactElement {
   const { data } = useQuery([props.dataKey], () => props.retriever(token));
 
   if (data) {
-    return props.renderData(data);
+    return props.renderData(data.data);
   }
 
   return <></>;

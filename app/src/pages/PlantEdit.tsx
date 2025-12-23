@@ -1,5 +1,5 @@
 import { FormikProvider, useFormik } from "formik";
-import { getStationDetails, updateStation } from "../api";
+import { createRetriever } from "../api";
 import { useParams } from "react-router-dom";
 import * as z from "zod";
 import InputField from "../components/InputField";
@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "react-query";
 import { toFormikValidationSchema } from "zod-formik-adapter";
 import { AttributeSchema } from "../schemas";
+import { StationUpdate } from "../backend-client/api";
 
 type AttributeUpdate = z.infer<typeof AttributeSchema>;
 
@@ -20,16 +21,18 @@ export const PlantEdit = () => {
   const auth = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data } = useQuery([`plants/${plantId}/details`], () => getStationDetails(plantId ?? "")(auth.token ?? ""));
+  const getStation = createRetriever(x => x.getStation(plantId ?? ""));
+  const updateStation = (update: StationUpdate) => createRetriever(x => x.updateStation(plantId ?? "", update))
+  const { data } = useQuery([`plants/${plantId}/details`], () => getStation(auth.token ?? ""));
 
   const BasicSettings = () => {
     const form = useFormik({
       enableReinitialize: true,
-      initialValues: data?.station ?? { name: "", location: "", description: "" },
+      initialValues: data?.data.station ?? { name: "", location: "", description: "" },
       validationSchema: toFormikValidationSchema(AttributeSchema),
       onSubmit: (values: AttributeUpdate) => {
         queryClient.invalidateQueries("plants");
-        updateStation(plantId ?? "", values)(auth.token ?? "").then(() => navigate(`/#/plants/${plantId}`));
+        updateStation(values)(auth.token ?? "").then(() => navigate(`/#/plants/${plantId}`));
       },
     });
 
