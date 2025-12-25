@@ -4,7 +4,8 @@ import { useParams } from "react-router";
 import { createRetriever } from "../api";
 import { useAuth } from "../AuthContext";
 import { useNavigate } from "react-router-dom";
-import { PlantProfileVariablesDisplay } from "../components/PlantProfileVariables";
+import { PlantProfileDisplay } from "../components/PlantProfile";
+import { CheckIcon } from '@heroicons/react/24/solid';
 
 enum Step {
   UploadImage,
@@ -58,12 +59,64 @@ const PlantAvatarUpload: React.FC<{}> = ({}) => {
 
   const handleConfirm = () => {
     if (selectedProfile) {
-      createRetriever(x => x.setProfile(plantId ?? "", selectedProfile))(auth.token ?? "").then(() => navigate(`/#/plants/${plantId}`));
+      createRetriever(x => x.setProfile(plantId ?? "", selectedProfile))(auth.token ?? "")
+        .then(() => navigate(`/#/plants/${plantId}`));
     }
   };
 
+  // Step data for display
+  const steps = [
+    { id: '01', name: 'Upload Image', status: step === Step.UploadImage ? 'current' : step > Step.UploadImage ? 'complete' : 'upcoming' },
+    { id: '02', name: 'Select Profile', status: step === Step.SelectProfile ? 'current' : step > Step.SelectProfile ? 'complete' : 'upcoming' },
+    { id: '03', name: 'Confirm', status: step === Step.Confirm ? 'current' : 'upcoming' },
+  ];
+
   return (
-    <div className="max-w-md mx-auto p-4 border rounded-md shadow-md bg-white">
+    <div className="mx-auto p-4 border rounded-md shadow-md bg-white">
+
+      {/* Step indicator */}
+      <nav aria-label="Progress" className="mb-6">
+        <ol
+          role="list"
+          className="divide-y divide-gray-300 rounded-md border border-gray-300 md:flex md:divide-y-0"
+        >
+          {steps.map((s, idx) => (
+            <li key={s.name} className="relative md:flex md:flex-1">
+              {s.status === 'complete' ? (
+                <span className="flex items-center px-6 py-4 text-sm font-medium">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-green-600">
+                    <CheckIcon className="h-6 w-6 text-white" />
+                  </span>
+                  <span className="ml-4 text-sm font-medium text-gray-900">{s.name}</span>
+                </span>
+              ) : s.status === 'current' ? (
+                <span className="flex items-center px-6 py-4 text-sm font-medium">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-green-600">
+                    <span className="text-green-600">{s.id}</span>
+                  </span>
+                  <span className="ml-4 text-sm font-medium text-green-600">{s.name}</span>
+                </span>
+              ) : (
+                <span className="flex items-center px-6 py-4 text-sm font-medium">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-300">
+                    <span className="text-gray-500">{s.id}</span>
+                  </span>
+                  <span className="ml-4 text-sm font-medium text-gray-500">{s.name}</span>
+                </span>
+              )}
+              {idx !== steps.length - 1 && (
+                <div aria-hidden="true" className="absolute top-0 right-0 hidden h-full w-5 md:block">
+                  <svg fill="none" viewBox="0 0 22 80" preserveAspectRatio="none" className="h-full w-full text-gray-300">
+                    <path d="M0 -2L20 40L0 82" stroke="currentColor" vectorEffect="non-scaling-stroke" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      {/* Main step content */}
       {step === Step.UploadImage && (
         <>
           <h2 className="text-lg font-semibold mb-4">Upload an Image</h2>
@@ -79,7 +132,7 @@ const PlantAvatarUpload: React.FC<{}> = ({}) => {
               <button
                 onClick={handleUpload}
                 disabled={loading}
-                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
               >
                 {loading ? "Uploading..." : "Upload"}
               </button>
@@ -91,43 +144,38 @@ const PlantAvatarUpload: React.FC<{}> = ({}) => {
 
       {step === Step.SelectProfile && (
         <>
-            <h2 className="text-lg font-semibold mb-4">Select a Profile</h2>
-            <ul className="space-y-4">
-            {profiles.map((profile) => (
-                <li key={profile.name}>
-                <button
-                    onClick={() => handleProfileSelect(profile)}
-                    className="w-full text-left p-4 border rounded hover:bg-gray-50 flex flex-col gap-2"
-                >
-                    <span className="font-medium">{profile.name}</span>
 
-                    <PlantProfileVariablesDisplay variables={profile.variables} />
-                </button>
-                </li>
-            ))}
-            </ul>
+          <h2 className="text-lg font-semibold mb-4">Select a Profile</h2>
 
           <button
             onClick={() => setStep(Step.UploadImage)}
-            className="mt-4 px-4 py-2 border rounded hover:bg-gray-100"
+            className="mb-4 px-4 py-2 border rounded hover:bg-gray-100"
           >
             Back
           </button>
+
+          <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {profiles.map((profile) => (
+              <li key={profile.name}>
+                <button
+                  onClick={() => handleProfileSelect(profile)}
+                  className="w-full text-left p-4 flex flex-col gap-2"
+                >
+                  <PlantProfileDisplay profile={profile} />
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          
         </>
+
       )}
 
       {step === Step.Confirm && selectedProfile && (
         <>
           <h2 className="text-lg font-semibold mb-4">Confirm Selection</h2>
-          <p className="mb-4">
-
-            You selected: <strong>{selectedProfile.name}</strong>
-
-            <div className="w-full text-left p-4 border flex flex-col gap-2 mt-4">
-                <PlantProfileVariablesDisplay variables={selectedProfile.variables} />
-            </div>
-            
-          </p>
+          <PlantProfileDisplay profile={selectedProfile} />
           <div className="flex gap-2">
             <button
               onClick={handleConfirm}

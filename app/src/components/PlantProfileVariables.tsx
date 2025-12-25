@@ -1,3 +1,4 @@
+import { Leaf } from "lucide-react";
 import { PlantProfileVariables } from "../backend-client/api";
 
 export interface PlantProfileVariablesDisplayProps {
@@ -6,7 +7,9 @@ export interface PlantProfileVariablesDisplayProps {
 
 export const PlantProfileVariablesDisplay: React.FC<PlantProfileVariablesDisplayProps> = ({ variables }) => {
   return (
-    <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+    <div className="mt-5">
+<Leaf className="absolute right-4 bottom-4 text-green-100 w-24 h-24 opacity-70 pointer-events-none" />
+<div className="flex flex-wrap gap-3">
       <div className="flex items-center gap-1">
         🌞 <span>Light (µmol): {variables.lightMmol.start}–{variables.lightMmol.end}</span>
       </div>
@@ -26,5 +29,7 @@ export const PlantProfileVariablesDisplay: React.FC<PlantProfileVariablesDisplay
         ⚡ <span>Soil EC: {variables.soilEc.start}–{variables.soilEc.end} mS/cm</span>
       </div>
     </div>
+    </div>
+    
   );
 };
