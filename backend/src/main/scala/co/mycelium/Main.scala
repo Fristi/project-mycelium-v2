@@ -122,6 +122,6 @@ object Main extends IOApp {
     ).void
       .recoverWith {
         case _: BucketAlreadyExistsException => IO.unit
-        case error                           => IO.delay(error.printStackTrace())
+        case error                           => IO.unit
       }
 }
